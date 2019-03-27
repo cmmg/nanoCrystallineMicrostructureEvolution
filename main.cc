@@ -110,16 +110,16 @@ namespace elasticity1
     std::vector<bool> uBCX0 (dim, true); uBCX0[0]=true;
     VectorTools::interpolate_boundary_values (dof_handler, 0, ZeroFunction<dim>(dim), constraints, uBCX0);
     VectorTools::interpolate_boundary_values (dof_handler, 0, ZeroFunction<dim>(dim), constraints2, uBCX0);
-    std::vector<bool> uBCY0 (dim, false); uBCY0[1]=true;
-    VectorTools::interpolate_boundary_values (dof_handler, 2, ZeroFunction<dim>(dim), constraints, uBCY0);
-    VectorTools::interpolate_boundary_values (dof_handler, 2, ZeroFunction<dim>(dim), constraints2, uBCY0);
+    //std::vector<bool> uBCY0 (dim, false); uBCY0[1]=true;
+    //VectorTools::interpolate_boundary_values (dof_handler, 2, ZeroFunction<dim>(dim), constraints, uBCY0);
+    //VectorTools::interpolate_boundary_values (dof_handler, 2, ZeroFunction<dim>(dim), constraints2, uBCY0);
     if (dim==3) {
       std::vector<bool> uBCZ0 (dim, false); uBCZ0[2]=true;
       VectorTools::interpolate_boundary_values (dof_handler, 4, ZeroFunction<dim>(dim), constraints, uBCZ0);
       VectorTools::interpolate_boundary_values (dof_handler, 4, ZeroFunction<dim>(dim), constraints2, uBCZ0);
     }
     std::vector<bool> uBCX1 (dim, false); uBCX1[0]=true; 
-    VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.005, dim), constraints, uBCX1);
+    VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.001, dim), constraints, uBCX1);
     VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints2, uBCX1);
     
     constraints.close ();
@@ -185,7 +185,7 @@ namespace elasticity1
       }
     }
   }
-
+  
   //Assembly
   template <int dim>
   void elasticity<dim>::assemble_system (){

@@ -22,14 +22,13 @@ public:
   double eqvstress, equvStrain;
   double elasStrain11, elasStrain22;
   dealii::Table<2, double > bLeftcauchy, bLeftcauchyIteration;
-  //dealii::Table<2, double> defgrad, defgradIteration;
   dealii::FullMatrix<double> defgrad, defgradIteration;
   dealii::Table<1, double > backstress, backstressIteration;
 };
 //mechanics implementation
 template <class T, int dim>
   void evaluateStress(unsigned int q, const unsigned int DOF, const Table<1, T>& ULocal, const deformationMap<T, dim>& defMap, unsigned int currentIteration,unsigned int currentIncrement,  std::vector<historyVariables<dim>*>& history, Table<2, double>& Kirchhoff_stress, Table<2, double>& Piola_stress, Table<4,double>& C,  Table<2,double>& invF, FEValues<dim>& fe_values){ 
-
+  
   //update history variables at the start of increment
   if (currentIteration==0){
     history[q]->alpha=history[q]->alphaIteration;
@@ -42,13 +41,13 @@ template <class T, int dim>
   //Table<2, double> Fn(dim,dim);
   FullMatrix<double> _be(dim,dim),_beT(dim, dim), defgradInv(dim, dim), C_cg(dim, dim), C_cgInv(dim, dim), Ft(dim, dim),FtInv(dim, dim), a_elastic(dim, dim),a_elasticInv(dim, dim);
   FullMatrix<double> h1(dim, dim),h1Inv(dim, dim), h2(dim, dim), h3(dim, dim),h3Inv(dim, dim);
-  Table<4, double> II(dim, dim, dim, dim), IIbe(dim, dim, dim, dim),_D(dim, dim, dim, dim), _Dr(dim, dim, dim, dim), _Drr(dim, dim, dim, dim), C_ep(dim, dim, dim, dim), Cr(dim, dim, dim, dim), Crr(dim, dim, dim, dim) ;
+  Table<4, double> II(dim, dim, dim, dim), IIbe(dim, dim, dim, dim),_D(dim, dim, dim, dim), _Dr(dim, dim, dim, dim), _Drr(dim, dim, dim, dim), C_ep(dim, dim, dim, dim), Cr(dim, dim, dim, dim), Crr(dim, dim, dim, dim) ; 
   Table<5, double> C_tr(dim, dim, dim, dim, dim);
   Table<1, double> principal_stress(dim), dev_principal_stress(dim), eigval(dim), _backstress(dim),  _eigval(dim);
   LAPACKFullMatrix<double> b_eTReig(dim, dim), Ident(dim, dim);
   std::vector< Vector<double> > eigvec(dim);
   Table<3, double> nxn(dim, dim, dim);
-
+  
   // double counter=0;
   double nu=PoissonsRatio, Y=elasticModulus;
   double lambda=(nu*Y)/((1+nu)*(1-2*nu)), mu=Y/(2*(1+nu));
@@ -172,12 +171,10 @@ template <class T, int dim>
       }
   }
   
-  for(unsigned int i=0;i<dim;i++)
-    {
-      dev_principal_stress[i]=principal_stress[i]-(1./3.)*(principal_stress[0]+principal_stress[1]+principal_stress[2]);
-      norm+=(dev_principal_stress[i]-history[q]->backstress[i])*(dev_principal_stress[i]-history[q]->backstress[i]);
-    }
+  for(unsigned int i=0;i<dim;i++)dev_principal_stress[i]=principal_stress[i]-(1./3.)*(principal_stress[0]+principal_stress[1]+principal_stress[2]);
+   
   
+  for(unsigned int i=0;i<dim;i++) norm+=(dev_principal_stress[i]-_backstress[i])*(dev_principal_stress[i]-_backstress[i]);
   
   yieldcriteria=std::sqrt(norm)-std::sqrt(2./3.)*(tau_y+K*history[q]->alpha);
  
@@ -198,7 +195,7 @@ template <class T, int dim>
 	for(unsigned int j=0;j<dim;j++)
 	  for(unsigned int k=0;k<dim;k++)
 	    for(unsigned int l=0;l<dim;l++)
-	      _Dr[i][j][k][l]=(1./4.)*(_Drr[i][j][k][l] + _Drr[j][i][k][l] + _Drr[i][j][l][k] + _Drr[j][i][l][k]   );
+	      _Dr[i][j][k][l]+=(1./4.)*(_Drr[i][j][k][l] + _Drr[j][i][k][l] + _Drr[i][j][l][k] + _Drr[j][i][l][k]   );
       
       
       
@@ -206,7 +203,7 @@ template <class T, int dim>
 	for(unsigned int j=0;j<dim;j++)
 	  for(unsigned int k=0;k<dim;k++)
 	    for(unsigned int l=0;l<dim;l++)
-	      _D[i][j][k][l]=lambda*C_cgInv(i,j)*C_cgInv(k,l)-lambda*std::log(det_Ccg)*_Dr[i][j][k][l];
+	      _D[i][j][k][l]+=lambda*C_cgInv(i,j)*C_cgInv(k,l)-lambda*std::log(det_Ccg)*_Dr[i][j][k][l];
       
        if(multiplicity==1){
 	
@@ -214,9 +211,9 @@ template <class T, int dim>
 	for(unsigned int i=0;i<dim;i++)
 	  for(unsigned int j=0;j<dim; j++)
 	    for(unsigned int k=0;k<dim;k++){
-	      P1[i][j]+=(C_cg(i,k)-_eigval[2]*(i==k))*(C_cg(k,j)-_eigval[1]*(k==j))/((_eigval[0]-_eigval[1])*(_eigval[0]-_eigval[2]));
-	      P2[i][j]+=(C_cg(i,k)-_eigval[0]*(i==k))*(C_cg(k,j)-_eigval[2]*(k==j))/((_eigval[1]-_eigval[2])*(_eigval[1]-_eigval[0]));
-	      P3[i][j]+=(C_cg(i,k)-_eigval[1]*(i==k))*(C_cg(k,j)-_eigval[0]*(k==j))/((_eigval[2]-_eigval[0])*(_eigval[2]-_eigval[1]));
+	      P1[i][j]+=(C_cg(i,k)-(_eigval[2])*(i==k))*(C_cg(k,j)-(_eigval[1])*(k==j))/(((_eigval[0])-(_eigval[1]))*((_eigval[0])-(_eigval[2])));
+	      P2[i][j]+=(C_cg(i,k)-(_eigval[0])*(i==k))*(C_cg(k,j)-(_eigval[2])*(k==j))/(((_eigval[1])-(_eigval[2]))*((_eigval[1])-(_eigval[0])));
+	      P3[i][j]+=(C_cg(i,k)-(_eigval[1])*(i==k))*(C_cg(k,j)-(_eigval[0])*(k==j))/(((_eigval[2])-(_eigval[0]))*((_eigval[2])-(_eigval[1])));
 	    }//for loop end
 	
 	for(unsigned int i=0;i<dim;i++)
@@ -230,46 +227,84 @@ template <class T, int dim>
 	  for(unsigned int j=0;j<dim;j++)
 	    for(unsigned int k=0;k<dim;k++)
 	      for(unsigned int l=0;l<dim;l++)
-		Cr[i][j][k][l]=(1./4.)*(Crr[i][j][k][l]+Crr[i][j][l][k]+Crr[j][i][k][l]+Crr[j][i][l][k]);
+	      Cr[i][j][k][l]+=(1./4.)*(Crr[i][j][k][l]+Crr[i][j][l][k]+Crr[j][i][k][l]+Crr[j][i][l][k]);
 	
 	for(unsigned int i=0;i<dim;i++)
 	  for(unsigned int j=0;j<dim;j++)
 	    for(unsigned int k=0;k<dim;k++)
 	      for(unsigned int l=0;l<dim;l++)
 		C_ep[i][j][k][l]=_D[i][j][k][l] + 2*mu*Cr[i][j][k][l];
-	
-		}//if multiplicity==1 end
-      
-      if(multiplicity==3)
-	{
-	  for(unsigned int i=0;i<dim;i++)
-	    for(unsigned int j=0;j<dim;j++)
-	      for(unsigned int k=0;k<dim;k++)
-		for(unsigned int l=0;l<dim;l++){
-		  C_ep[i][j][k][l]+=_D[i][j][k][l]+2*mu*(1-std::log(_eigval[0]))*II[i][j][k][l]/(_eigval[0]*_eigval[0]);
-		}
-	}
-
-      for(unsigned int i=0;i<dim;i++)
-	for(unsigned int I=0;I<dim;I++)
+	for(unsigned int i=0;i<dim;i++)
 	  for(unsigned int j=0;j<dim;j++)
-	    for(unsigned int J=0;J<dim;J++)
-	      for(unsigned int k=0;k<dim;k++)
-		for(unsigned int K=0;K<dim;K++)
-		  for(unsigned int l=0;l<dim;l++)
-		    for(unsigned int L=0;L<dim;L++)
-		      C[i][j][k][l]+=Ft(i,I)*Ft(j,J)*Ft(k,K)*Ft(l,L)*C_ep[I][J][K][L];
-      
-      //to avoid division by zero at first increment C =st.venont kirchhoff model
-      if(currentIncrement==1 && currentIteration==0)
-	{
-	  for(unsigned int i=0;i<dim;i++)
-	    for(unsigned int j=0;j<dim;j++)
-	      for(unsigned int k=0;k<dim;k++)
-		for(unsigned int l=0;l<dim;l++)
-		  C[i][j][k][l]=lambda*(i==j)*(k==l) +mu*((i==k)*(j==l) + (i==l)*(j==k));
-	}
-      
+	    for(unsigned int k=0;k<dim;k++)
+	      for(unsigned int l=0;l<dim;l++){
+		if((C_ep[i][j][k][l]-C_ep[i][j][l][k])>tol || (C_ep[i][j][k][l]-C_ep[i][j][l][k])<-tol){std::cout<<"C_not_symmetric_minor_symmetry1_m=1"; exit(-1);}
+		if((C_ep[i][j][k][l]-C_ep[j][i][k][l])>tol || (C_ep[i][j][k][l]-C_ep[j][i][k][l])<-tol){std::cout<<"C_not_symmetric_minor_symmetry2_m=1"; exit(-1);}
+		if((C_ep[i][j][k][l]-C_ep[j][i][l][k])>tol || (C_ep[i][j][k][l]-C_ep[j][i][l][k])<-tol){std::cout<<"C_not_symmetric_minor_symmetry3_m=1"; exit(-1);}
+		if((C_ep[i][j][k][l]-C_ep[k][l][i][j])>tol || (C_ep[i][j][k][l]-C_ep[k][l][i][j])<-tol){std::cout<<"C_not_symmetric_major_symmetry3_m=1"; exit(-1);}	      
+	      }
+	
+	
+       }//if multiplicity==1 end
+       
+       if(multiplicity==3)
+	 {
+	   for(unsigned int i=0;i<dim;i++)
+	     for(unsigned int j=0;j<dim;j++)
+	       for(unsigned int k=0;k<dim;k++)
+		 for(unsigned int l=0;l<dim;l++){
+		   C_ep[i][j][k][l]+=_D[i][j][k][l]+2*mu*(1-std::log(_eigval[0]))*II[i][j][k][l]/(_eigval[0]*_eigval[0]);
+		 }
+	   for(unsigned int i=0;i<dim;i++)
+	     for(unsigned int j=0;j<dim;j++)
+	       for(unsigned int k=0;k<dim;k++)
+		 for(unsigned int l=0;l<dim;l++){
+		   if((C_ep[i][j][k][l]-C_ep[i][j][l][k])>tol || (C_ep[i][j][k][l]-C_ep[i][j][l][k])<-tol){std::cout<<"C_not_symmetric_minor_symmetry1_m=3"; exit(-1);}
+		   if((C_ep[i][j][k][l]-C_ep[j][i][k][l])>tol || (C_ep[i][j][k][l]-C_ep[j][i][k][l])<-tol){std::cout<<"C_not_symmetric_minor_symmetry2_m=3"; exit(-1);}
+		   if((C_ep[i][j][k][l]-C_ep[j][i][l][k])>tol || (C_ep[i][j][k][l]-C_ep[j][i][l][k])<-tol){std::cout<<"C_not_symmetric_minor_symmetry3_m=3"; exit(-1);}
+		   if((C_ep[i][j][k][l]-C_ep[k][l][i][j])>tol || (C_ep[i][j][k][l]-C_ep[k][l][i][j])<-tol){std::cout<<"C_not_symmetric_major_symmetry3_m=3"; exit(-1);}	      
+		 }
+	   
+	   
+	   
+	 }
+       
+       //check C for symmetry
+       
+       for(unsigned int i=0;i<dim;i++)
+	 for(unsigned int j=0;j<dim;j++)
+	   for(unsigned int k=0;k<dim;k++)
+	     for(unsigned int l=0;l<dim;l++)
+	       for(unsigned int I=0;I<dim;I++)
+		 for(unsigned int J=0;J<dim;J++)
+		   for(unsigned int K=0;K<dim;K++)
+		     for(unsigned int L=0;L<dim;L++)
+		       C[i][j][k][l]+=Ft(i,I)*Ft(j,J)*Ft(k,K)*Ft(l,L)*C_ep[I][J][K][L];
+       
+       for(unsigned int i=0;i<dim;i++)
+	 for(unsigned int j=0;j<dim;j++)
+	   for(unsigned int k=0;k<dim;k++)
+	     for(unsigned int l=0;l<dim;l++){
+	       if((C[i][j][k][l]-C[i][j][l][k])>tol || (C[i][j][k][l]-C[i][j][l][k])<-tol){std::cout<<"C_not_symmetric_minor_symmetry1_m=1"; exit(-1);}
+	       if((C[i][j][k][l]-C[j][i][k][l])>tol || (C[i][j][k][l]-C[j][i][k][l])<-tol){std::cout<<"C_not_symmetric_minor_symmetry2_m=1"; exit(-1);}
+	       if((C[i][j][k][l]-C[j][i][l][k])>tol || (C[i][j][k][l]-C[j][i][l][k])<-tol){std::cout<<"C_not_symmetric_minor_symmetry3_m=1"; exit(-1);}
+	       if((C[i][j][k][l]-C[k][l][i][j])>tol || (C[i][j][k][l]-C[k][l][i][j])<-tol){std::cout<<"C_not_symmetric_major_symmetry3_m=1"; exit(-1);}	      
+	     }
+       
+       
+       
+       
+       
+       //to avoid division by zero at first increment C =st.venont kirchhoff model
+       if(currentIncrement==1 && currentIteration==0)
+	 {
+	   for(unsigned int i=0;i<dim;i++)
+	     for(unsigned int j=0;j<dim;j++)
+	       for(unsigned int k=0;k<dim;k++)
+		 for(unsigned int l=0;l<dim;l++)
+		   C[i][j][k][l]=lambda*(i==j)*(k==l) +mu*((i==k)*(j==l) + (i==l)*(j==k));
+	 }
+       
     }
   //elastic part ends
   
@@ -277,9 +312,9 @@ template <class T, int dim>
     {
       //plastic
       //calculate gamma
-      //exit(-1);
+      //{std::cout<<"plasticity triggered";exit(-1);}
       unsigned int ctr=0;
-      /* function=yieldcriteria-(2*mu*gamma)-std::sqrt(2./3.)*K*(alpha-history[q]->alpha);
+      function=yieldcriteria-(2*mu*gamma)-std::sqrt(2./3.)*K*(alpha-history[q]->alpha);
       double mod_f=function;
       if(function<0)mod_f=-1.0*function;
       while(mod_f>tol)
@@ -292,14 +327,22 @@ template <class T, int dim>
 	  if(function<0)mod_f=-1.0*function;
 	  ctr++;
 	  if(ctr>30){std::cout<<"max itr for gamma";exit(-1);}
-	  }*/
+	  }
 
-      gamma=yieldcriteria/(2*mu);
-      alpha=history[q]->alpha + std::sqrt(2./3.)*gamma;
+      //  gamma=yieldcriteria/(2*mu);
+      //alpha=history[q]->alpha + std::sqrt(2./3.)*gamma;
       //GAMMA AND ALPHA CALCULATED
-     
       
       //update eigen values i.e. principal stretches
+      
+      for(unsigned int i=0;i<dim;i++){
+	principal_stress[i]=principal_stress[i]-2*mu*gamma*(dev_principal_stress[i]-history[q]->backstress[i])/std::sqrt(norm);
+	_backstress[i]=(history[q]->backstress[i])+(2./3.)*gamma*H*(dev_principal_stress[i]-history[q]->backstress[i])/std::sqrt(norm);
+      } //update eigen values
+      norm=0.;
+      for(unsigned int i=0;i<dim;i++)dev_principal_stress[i]=principal_stress[i]-(1./3.)*(principal_stress[0]+principal_stress[1]+principal_stress[2]);
+      for(unsigned int i=0;i<dim;i++) norm+=(dev_principal_stress[i]-_backstress[i])*(dev_principal_stress[i]-_backstress[i]);
+      
       for(unsigned int A=0;A<dim;A++){
 	unsigned int B=(A+1)%3;
 	unsigned int C=(B+1)%3;
@@ -333,15 +376,14 @@ template <class T, int dim>
       //calculate h1 h2 h3 to calculate C_ep
       for(unsigned int i=0;i<dim;i++)
 	for(unsigned int j=0;j<dim;j++){
-	  df_dbeta2[i][j]+=-(principal_stress[i]-_backstress[i])*(principal_stress[j]-_backstress[j])/(std::pow(norm,1.5)) + ((double)(i==j)-(1./3.))/(std::sqrt(norm));
+	  df_dbeta2[i][j]+=-(principal_stress[i]-_backstress[i])*(principal_stress[j]-_backstress[j])/(std::pow(norm,3./2.)) + ((double)(i==j)-(1./3.))/(std::sqrt(norm));
 	}
       
       //h1
       for(unsigned int i=0;i<dim;i++)
-	for(unsigned int j=0;j<dim;j++)
-	  {
-	    h1Inv(i,j)=(i==j);// + (2./3.)*H*gamma*df_dbeta2[i][j];
-	  }
+	for(unsigned int j=0;j<dim;j++){
+	  h1Inv(i,j)=(i==j);// + (2./3.)*H*gamma*df_dbeta2[i][j];
+	}
       h1.invert(h1Inv);
       for(unsigned int i=0;i<dim;i++)
 	for(unsigned int j=0;j<dim;j++){
@@ -354,10 +396,9 @@ template <class T, int dim>
       for(unsigned int i=0;i<dim;i++)
 	for(unsigned int j=0;j<dim;j++){
 	  h3Inv(i,j)+=a_elasticInv(i,j);
-	  for(unsigned int k=0;k<dim;k++)
-	    {
-	      h3Inv(i,j)+=gamma*df_dbeta2[i][k]*h2(k,j);
-	    }
+	  for(unsigned int k=0;k<dim;k++){
+	    h3Inv(i,j)+=gamma*df_dbeta2[i][k]*h2(k,j);
+	  }
 	}
       h3.invert(h3Inv);
       h4=1;//-gamma*(K)*(0); //note that \partial^2{f}/ \partial^2{q}=0
@@ -371,14 +412,18 @@ template <class T, int dim>
 	      denominator+=(dev_principal_stress[m]-_backstress[m])*(h2(m,n)*h3(n,p)*h2(p,r)+(2./3.)*H*h1(m,r))*(dev_principal_stress[r]-_backstress[r])/norm;
       
       denominator=h4*denominator+(2./3.)*K;
-      
+
+      Table<1,double> a_epL(dim), a_epR( dim);
+
       for(unsigned int i=0;i<dim;i++)
 	for(unsigned int j=0;j<dim;j++)
-	  for(unsigned int k=0;k<dim;k++)
-	    for(unsigned int l=0;l<dim;l++)
-	      for(unsigned int m=0;m<dim;m++)
-		for(unsigned int n=0;n<dim;n++)
-		  a_elastoplastic[i][j]+=h4*h3(i,k)*h2(k,l)*(dev_principal_stress[l]-_backstress[l])*h3(j,m)*h2(m,n)*(dev_principal_stress[n]-_backstress[n])/norm;
+	  for(unsigned int k=0;k<dim;k++){
+	    a_epR[i]+=h3(i,j)*h2(j,k)*(dev_principal_stress[k]-_backstress[k])/sqrt(norm);
+	    a_epL[i]+=h3(i,j)*h2(j,k)*(dev_principal_stress[k]-_backstress[k])/sqrt(norm);
+	  }
+      for(unsigned int i=0;i<dim;i++)
+	for(unsigned int j=0;j<dim;j++)
+	  a_elastoplastic[i][j]=h4*a_epL[i]*a_epR[j];
       
       for(unsigned int i=0;i<dim;i++)
 	for(unsigned int j=0;j<dim;j++)
@@ -402,14 +447,8 @@ template <class T, int dim>
 	      for(unsigned int l=0;l<dim;l++){
 		C_ep[i][j][k][l]+=2*principal_stress[A]*C_tr[A][i][j][k][l];
 	      }
-       for(unsigned int i=0;i<dim;i++){
-	principal_stress[i]=principal_stress[i]-2*mu*gamma*(dev_principal_stress[i]-history[q]->backstress[i])/std::sqrt(norm);
-	_backstress[i]=(history[q]->backstress[i])+(2./3.)*gamma*H*(dev_principal_stress[i]-history[q]->backstress[i])/std::sqrt(norm);
-      } //update eigen values
-      for(unsigned int i=0;i<dim;i++){
-	dev_principal_stress[i]=principal_stress[i]-(1./3.)*(principal_stress[0]+principal_stress[1]+principal_stress[2]);
-	norm+=(dev_principal_stress[i]-history[q]->backstress[i])*(dev_principal_stress[i]-history[q]->backstress[i]);
-      }
+       
+     
       //C_ep calculated
       C=C_ep;
       for(unsigned int i=0;i<dim;i++)_eigval[i]=eigval[i];
@@ -484,16 +523,8 @@ void residualForMechanics(FEValues<dim>& fe_values, unsigned int DOF, Table<1, d
 	}
       }
     }
-
-    for(unsigned int A=0;A<dofs_per_cell;A++){
-      for(unsigned int j=0;j<dim;j++){
-	for(unsigned int B=0;B<dofs_per_cell;B++){
-	  for(unsigned int k=0;k<dim;k++){
-	    //KLocal(A,B)+=fe_values.shape_grad(A,q)[j]*Kirchhoff_stress[j][k]*fe_values.shape_grad(B,q)[k]*fe_values.JxW(q);
-	  }
-	}
-      }
-    }
+    //add geomteric stiffness term here
+    
        
     //end quadrature loop
     
