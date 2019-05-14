@@ -1,6 +1,6 @@
 //update elastoplastic tangent modulus
 template<int dim>
-void elastoplastic_tangent(FullMatrix<double>&Fe, FullMatrix<double>&Fp, FullMatrix<double>&F, Table<2, double>&SPK, Table<4, double>& variation_Fe, Table<4, double>&variation_Fp, Table<4, double>&variation_SPK,Table<4, double>&ElastoPlasticModulii){
+void elastoplastic_tangent(FullMatrix<double>&Fe, FullMatrix<double>&Fp, FullMatrix<double>&F, Table<2, double>&SPK, Table<4, double>& variation_Fe, Table<4, double>&variation_Fp, Table<4, double>&variation_SPK,Table<4, double>&ElastoPlasticModulii, unsigned int currentIncrement, unsigned int currentIteration){
   FullMatrix<double> Fp_inv(dim, dim);
   FullMatrix<double> F_inv(dim, dim);
   F_inv.invert(F);
@@ -29,7 +29,7 @@ void elastoplastic_tangent(FullMatrix<double>&Fe, FullMatrix<double>&Fp, FullMat
 	    for(unsigned int j=0;j<dim;j++)
 	      for(unsigned int J=0;J<dim;J++)
 		EM1[i][J][l][L]+=variation_Fe[i][A][l][L]*SPK[A][B]*Fe(B,j)*F_inv(j,J);
-  
+  	  
 
   
 
@@ -42,9 +42,20 @@ void elastoplastic_tangent(FullMatrix<double>&Fe, FullMatrix<double>&Fp, FullMat
 	    for(unsigned int j=0;j<dim;j++)
 	      for(unsigned int J=0;J<dim;J++)
 		EM2[i][J][l][L]+=Fe(i,A)*variation_SPK[A][B][l][L]*Fe(B,j)*F_inv(j,J);
-
-
-
+  /*if(currentIncrement==13 && currentIteration==1){
+    //for(unsigned int i=0;i<dim;i++){
+    //for(unsigned int j=0;j<dim;j++){
+	for(unsigned int k=0;k<dim;k++){
+	  for(unsigned int l=0;l<dim;l++){
+	    std::cout<<Fe/[k][l]<<" ";
+	  }std::cout<<"\n";
+	}
+	//  }
+  //}std::cout<<"\n";
+    
+  }*/
+  
+  
   //compute part 1 of tangent modulus variation
   for(unsigned int i=0;i<dim;i++)
     for(unsigned int A=0;A<dim;A++)

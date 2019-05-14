@@ -5,6 +5,16 @@ void myTable():Table<dim>(){
   }
   };*/
 
+template<class T>
+  int sign(T number){
+  if(number>0) return 1;
+  else{
+    if(number<0)
+    return -1;
+    else return 0;
+  }
+}
+
 template<int dim>
 void calculate_variation_Fe(Table<4, double>&variation_Fe, FullMatrix<double>&F, FullMatrix<double>&Fp, Table<4, double>&variation_Fp ){
   FullMatrix<double>Fp_inv(dim, dim);
@@ -142,8 +152,9 @@ void calculate_variation_system_matrix(Vector<int>& ActiveSystems,std::vector<Ta
       Table<4,double>varRCB1(dim,dim, dim, dim),varRCB2(dim, dim,dim,dim),varBT1(dim, dim, dim, dim),varBT2(dim, dim, dim, dim),variation_B(dim, dim, dim, dim);
       Table<2,double>B(dim, dim);
       for(unsigned int i=0;i<dim;i++)for(unsigned int j=0;j<dim;j++)B[i][j]=0.;
-       for(unsigned int i=0;i<size;i++)
-	 for(unsigned int j=0;j<size;j++)
+      
+       for(unsigned int i=0;i<dim;i++)
+	 for(unsigned int j=0;j<dim;j++)
 	   for(unsigned int k=0;k<dim;k++)
 	     for(unsigned int l=0;l<dim;l++){
 		 varRCB1[i][j][k][l]=0.;
@@ -180,7 +191,7 @@ void calculate_variation_system_matrix(Vector<int>& ActiveSystems,std::vector<Ta
 	for(unsigned int j=0;j<dim;j++)
 	  for(unsigned int m=0;m<dim;m++)
 	    for(unsigned int n=0;n<dim;n++)
-	      variation_system_matrix[I][J][m][n]+=(std::abs(shearStress[alpha])/shearStress[alpha])*(std::abs(shearStress[beta])/shearStress[beta])*(varRCB1[i][j][m][n]+varRCB2[i][j][m][n]+varBT1[i][j][m][n]+varBT2[i][j][m][n])*OriginalSchmidt[alpha][i][j];
+	      variation_system_matrix[I][J][m][n]+=sign(shearStress[alpha])*sign(shearStress[beta])*(varRCB1[i][j][m][n]+varRCB2[i][j][m][n]+varBT1[i][j][m][n]+varBT2[i][j][m][n])*OriginalSchmidt[alpha][i][j];
       //beta for loop end
       
     }
@@ -195,8 +206,8 @@ void calculate_variation_rhs(Table<3, double>&variation_rhs,Table<4, double>&var
 
   unsigned int size=ActiveSystems.size();
   Table<4, double>temp(dim, dim, dim, dim);
-  for(unsigned int i=0;i<size;i++)
-    for(unsigned int j=0;j<size;j++)
+  for(unsigned int i=0;i<dim;i++)
+    for(unsigned int j=0;j<dim;j++)
       for(unsigned int k=0;k<dim;k++)
 	for(unsigned int l=0;l<dim;l++)
 	  temp[i][j][k][l]=0.;
@@ -217,7 +228,7 @@ void calculate_variation_rhs(Table<3, double>&variation_rhs,Table<4, double>&var
       for(unsigned int j=0;j<dim;j++)
 	for(unsigned int m=0;m<dim;m++)
 	  for(unsigned int n=0;n<dim;n++)
-    variation_rhs[I][m][n]+=(std::abs(shearStress[alpha])/shearStress[alpha])*temp[i][j][m][n]*OriginalSchmidt[alpha][i][j];
+	    variation_rhs[I][m][n]+=sign(shearStress[alpha])*temp[i][j][m][n]*OriginalSchmidt[alpha][i][j];
   }
   
 }
@@ -316,7 +327,7 @@ void calculate_variation_Fp(Table<4, double>&variation_Fp,Table<4, double>&varia
       for(unsigned int k=0;k<dim;k++)
 	for(unsigned int m=0;m<dim;m++)
 	  for(unsigned int n=0;n<dim;n++)
-	    temp1[i][k][m][n]+=(std::abs(shearStress[alpha])/shearStress[alpha])*variation_gamma[I][m][n]*OriginalSchmidt[alpha][i][k];
+	    temp1[i][k][m][n]+=sign(shearStress[alpha])*variation_gamma[I][m][n]*OriginalSchmidt[alpha][i][k];
     
     for(unsigned int i=0;i<dim;i++)
       for(unsigned int j=0;j<dim;j++)

@@ -119,7 +119,7 @@ namespace elasticity1
      VectorTools::interpolate_boundary_values (dof_handler, 4, ZeroFunction<dim>(dim), constraints2, uBCZ0);
    }
    std::vector<bool> uBCX1 (dim, false); uBCX1[0]=true; 
-   VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0008, dim), constraints, uBCX1);
+   VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0005, dim), constraints, uBCX1);
    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints2, uBCX1);
     
     constraints.close ();
