@@ -253,8 +253,9 @@ template <class T, int dim>
   Table<2, double> slip_normal(n_slip_systems, dim);
   Table<2, double> slip_direction(n_slip_systems, dim);
   /*declare slip plane normals and slip directions*/
+  //slip_normal[0][0]=0.707;    slip_normal[0][1]=0.707;    slip_normal[0][2]=0.0; slip_direction[0][0]=0.707;  slip_direction[0][1]=-0.707;   slip_direction[0][2]=0.0;
   slip_normal[0][0]=0.577;    slip_normal[0][1]=0.577;    slip_normal[0][2]=0.577; slip_direction[0][0]=0.707;  slip_direction[0][1]=-0.707;   slip_direction[0][2]=0.0;
-  /* slip_normal[1][0]=0.577;    slip_normal[1][1]=0.577;    slip_normal[1][2]=0.577; slip_direction[1][0]=-0.707; slip_direction[1][1]=0.0;      slip_direction[1][2]=0.707;
+  slip_normal[1][0]=0.577;    slip_normal[1][1]=0.577;    slip_normal[1][2]=0.577; slip_direction[1][0]=-0.707; slip_direction[1][1]=0.0;      slip_direction[1][2]=0.707;
   slip_normal[2][0]=0.577;    slip_normal[2][1]=0.577;    slip_normal[2][2]=0.577; slip_direction[2][0]=0.0;    slip_direction[2][1]=0.707;    slip_direction[2][2]=-0.707;
   slip_normal[3][0]=-0.577;   slip_normal[3][1]=0.577;    slip_normal[3][2]=0.577; slip_direction[3][0]=0.707;  slip_direction[3][1]=0.0;      slip_direction[3][2]=0.707;
   slip_normal[4][0]=-0.577;   slip_normal[4][1]=0.577;    slip_normal[4][2]=0.577; slip_direction[4][0]=-0.707; slip_direction[4][1]=-0.707;   slip_direction[4][2]=0.0;
@@ -264,9 +265,9 @@ template <class T, int dim>
   slip_normal[8][0]=0.577;    slip_normal[8][1]=-0.577;   slip_normal[8][2]=0.577; slip_direction[8][0]=0.707;  slip_direction[8][1]=0.707;    slip_direction[8][2]=0.0;
   slip_normal[9][0]=-0.577;   slip_normal[9][1]=-0.577;   slip_normal[9][2]=0.577; slip_direction[9][0]=-0.707; slip_direction[9][1]=0.707;    slip_direction[9][2]=0.0;
   slip_normal[10][0]=-0.577;  slip_normal[10][1]=-0.577;  slip_normal[10][2]=0.577;slip_direction[10][0]=0.707; slip_direction[10][1]=0.0;     slip_direction[10][2]=0.707;
-  slip_normal[11][0]=-0.577;  slip_normal[11][1]=-0.577;  slip_normal[11][2]=0.577;slip_direction[11][0]=0.0;   slip_direction[11][1]=-0.707;  slip_direction[11][2]=-0.707;*/
+  slip_normal[11][0]=-0.577;  slip_normal[11][1]=-0.577;  slip_normal[11][2]=0.577;slip_direction[11][0]=0.0;   slip_direction[11][1]=-0.707;  slip_direction[11][2]=-0.707;
 
-  //crystal_rotation<dim>(slip_normal, slip_direction);
+  crystal_rotation<dim>(slip_normal, slip_direction);
  
   
   FullMatrix<double> F(dim, dim),F_inv(dim, dim),Fp(dim, dim),Fp_inv(dim, dim),F_e(dim, dim),Fe_inv(dim, dim),Fe_dot(dim, dim), F_dot(dim, dim), D(dim, dim), Dp(dim, dim), L(dim, dim), Le(dim, dim), We(dim, dim), Rotation(dim, dim), Trial_E(dim, dim), R_cauchy_green(dim, dim);
@@ -332,7 +333,7 @@ template <class T, int dim>
     
   unsigned int whilecounter=0;
   if(size>0){
-    //std::cout<<"plastic";exit(-1);
+    // std::cout<<"plastic";exit(-1);
     FullMatrix<double> active_system_matrix, active_system_inv;
     Vector<double> active_system_rhs;
     Vector<double> gamma;
