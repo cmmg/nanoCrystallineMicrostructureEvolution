@@ -202,7 +202,7 @@ void calculate_variation_system_matrix(Vector<int>& ActiveSystems,std::vector<Ta
 }
 
 template<int dim>
-void calculate_variation_rhs(Table<3, double>&variation_rhs,Table<4, double>&variation_E,Table<4, double>&variation_SPK,Table<2,double>&SPK,Table<2, double>&R_cauchy_green,Vector<int>&ActiveSystems ,std::vector<Table<2, double> >&OriginalSchmidt,Table<1, double>&shearStress){
+void calculate_variation_rhs(Table<3, double>&variation_rhs,Table<4, double>&variation_E,Table<4, double>&variation_SPK,Table<2,double>&SPK,Table<2, double>&R_cauchy_green,Vector<int>&ActiveSystems ,std::vector<Table<2, double> >&OriginalSchmidt,Table<1, double>&shearStress, Table<3, double>&variation_crss){
 
   unsigned int size=ActiveSystems.size();
   Table<4, double>temp(dim, dim, dim, dim);
@@ -231,11 +231,20 @@ void calculate_variation_rhs(Table<3, double>&variation_rhs,Table<4, double>&var
 	    variation_rhs[I][m][n]+=sign(shearStress[alpha])*temp[i][j][m][n]*OriginalSchmidt[alpha][i][j];
   }
   
+  /* for(unsigned int i=0;i<size;i++){
+    int I=ActiveSystems[i];
+    for(unsigned int m=0;m<dim;m++){
+      for(unsigned int n=0;n<dim;n++){
+	variation_rhs[I][m][n]-=variation_crss[i][m][n];
+      }
+    }
+    }*/
+  
 }
 
 
 template<int dim>
-void calculate_variation_gamma(Table<3, double>&variation_gamma,Table<2, double>&R_cauchy_green,FullMatrix<double>&active_system_matrix,Table<4,double>&variation_system_matrix,std::vector<Table<2, double> >&OriginalSchmidt, Vector<int>ActiveSystems,Vector<double>gamma_total, Table<2, double>&SPK,Table<4,double>&variation_E, Table<4, double>&variation_SPK, Table<1,double>&shearStress, Table<1,double>&crss){
+void calculate_variation_gamma(Table<3, double>&variation_gamma,Table<2, double>&R_cauchy_green,FullMatrix<double>&active_system_matrix,Table<4,double>&variation_system_matrix,std::vector<Table<2, double> >&OriginalSchmidt, Vector<int>ActiveSystems,Vector<double>gamma_total, Table<2, double>&SPK,Table<4,double>&variation_E, Table<4, double>&variation_SPK, Table<1,double>&shearStress, Table<1,double>&crss, Table<3, double>&variation_crss){
   
   unsigned int size=ActiveSystems.size();
   FullMatrix<double>active_system_inv(size, size);active_system_inv=0.0;
@@ -255,7 +264,7 @@ void calculate_variation_gamma(Table<3, double>&variation_gamma,Table<2, double>
 	temp[i][j][k]=0.;
 	temp1[i][j][k]=0.;
       }
-  calculate_variation_rhs<dim>(variation_rhs, variation_E, variation_SPK, SPK, R_cauchy_green, ActiveSystems ,OriginalSchmidt,shearStress);
+  calculate_variation_rhs<dim>(variation_rhs, variation_E, variation_SPK, SPK, R_cauchy_green, ActiveSystems ,OriginalSchmidt,shearStress, variation_crss);
   
   for(unsigned int I=0;I<size;I++){
     //unsigned int alpha=ActiveSystems[I];
@@ -287,11 +296,10 @@ void calculate_variation_gamma(Table<3, double>&variation_gamma,Table<2, double>
 
 
 template<int dim>
-void calculate_variation_Fp(Table<4, double>&variation_Fp,Table<4, double>&variation_E, Table<2, double>&updateFp, Vector<int>& ActiveSystems, std::vector< Table<2,double> >&OriginalSchmidt, FullMatrix<double>&Fp,Table<2, double>&SPK, Table<4, double>&variation_SPK,Table<2, double>&R_cauchy_green ,Vector<double>&gamma_total, FullMatrix<double>&active_system_matrix, Vector<double>&active_system_rhs,Table<1, double>&shearStress, Table<1, double>&crss, Table<4, double>&ElasticModulii){
+void calculate_variation_Fp(Table<4, double>&variation_Fp,Table<4, double>&variation_E, Table<2, double>&updateFp, Vector<int>& ActiveSystems, std::vector< Table<2,double> >&OriginalSchmidt, FullMatrix<double>&Fp,Table<2, double>&SPK, Table<4, double>&variation_SPK,Table<2, double>&R_cauchy_green ,Vector<double>&gamma_total, FullMatrix<double>&active_system_matrix, Vector<double>&active_system_rhs,Table<1, double>&shearStress, Table<1, double>&crss, Table<4, double>&ElasticModulii, Table<3, double>&variation_crss, Table<3, double>&variation_gamma){
   Table<4, double> variationtempFp(dim, dim, dim, dim);
   unsigned int size=ActiveSystems.size();
   Table<4,double>variation_system_matrix(size, size, dim, dim),temp2(dim, dim, dim, dim),temp3(dim, dim, dim, dim),temp4(dim, dim, dim, dim);
-  Table<3,double>variation_gamma(size, dim, dim);
   for(unsigned int i=0;i<dim;i++)
     for(unsigned int j=0;j<dim;j++)
       for(unsigned int k=0;k<dim;k++)
@@ -313,7 +321,7 @@ void calculate_variation_Fp(Table<4, double>&variation_Fp,Table<4, double>&varia
   
   
   calculate_variation_system_matrix<dim>( ActiveSystems, OriginalSchmidt, active_system_matrix, variation_system_matrix, variation_E, shearStress,R_cauchy_green, SPK, ElasticModulii);
-  calculate_variation_gamma<dim>(variation_gamma,R_cauchy_green, active_system_matrix, variation_system_matrix, OriginalSchmidt, ActiveSystems, gamma_total, SPK, variation_E, variation_SPK, shearStress, crss);
+  calculate_variation_gamma<dim>(variation_gamma,R_cauchy_green, active_system_matrix, variation_system_matrix, OriginalSchmidt, ActiveSystems, gamma_total, SPK, variation_E, variation_SPK, shearStress, crss,variation_crss);
  
   for(unsigned int I=0;I<size;I++){
     unsigned int alpha=ActiveSystems[I];
@@ -360,8 +368,70 @@ void calculate_variation_Fp(Table<4, double>&variation_Fp,Table<4, double>&varia
 	for(unsigned int l=0;l<dim;l++)
 	  variation_Fp[i][j][k][l]+=temp3[i][j][k][l]+temp4[i][j][k][l];
   
-   
-  
 }
 
 
+
+template<int dim>
+void calculate_variation_crss(Table<3, double>&var_crss_prev, Vector<int>&ActiveSystems, Table<3, double>&variation_gamma, Table<1, double>& crss, Vector<double>&gamma_total, Table<2, double>&slip_normal){
+  Table<3, double>var_crss_curr(n_slip_systems,dim, dim);
+  unsigned int size=0;
+  for(unsigned int i=0;i<n_slip_systems;i++)
+    for(unsigned int j=0;j<dim;j++)
+      for(unsigned int k=0;k<dim;k++)
+	var_crss_curr[i][j][k]=0.;
+
+  size=ActiveSystems.size();
+  for(unsigned int i=0;i<n_slip_systems;i++){
+    for(unsigned int I=0;I<size;I++){
+      if(i==ActiveSystems[I]){
+	for(unsigned int m=0;m<n_slip_systems;m++)
+	  for(unsigned int n=0;n<dim;n++)
+	    for(unsigned int p=0;p<dim;p++)
+	      var_crss_curr[m][n][p]=var_crss_prev[m][n][p];
+
+	for(unsigned int j=0;j<n_slip_systems;j++){
+	  for(unsigned int J=0;J<size;J++){
+	    if(j==ActiveSystems[J]){
+	      double h0=self_hardening;
+	      double coplanarity=0.,q;
+	      double a=2.25;
+	      coplanarity=std::pow((slip_normal[i][0]-slip_normal[j][0]),2)+std::pow((slip_normal[i][1]-slip_normal[j][1]),2)+std::pow((slip_normal[i][2]-slip_normal[j][2]),2);
+	      if(coplanarity<1e-6)q=1;
+	      else q=1.4;
+	      double h_alpha_beta= h0*q*std::pow((1- crss[j]/Ss),a);
+	      for(unsigned int m=0;m<dim;m++){
+		for(unsigned int n=0;n<dim;n++){
+		  var_crss_curr[i][m][n]+=h_alpha_beta*variation_gamma[J][m][n];
+		}
+	      }
+	      
+	      double var1=0.;
+	      var1=h0*(q+ (1-q)*(I==J))*std::pow((1-(crss[ActiveSystems[J]])/Ss),a-1)*(-1/Ss)*gamma_total[ActiveSystems[J]];
+	      for(unsigned int m=0;m<dim;m++){
+		for(unsigned int n=0;n<dim;n++){
+		  var_crss_curr[i][m][n]+=var1*var_crss_prev[i][m][n];
+		    }
+	      }
+	      
+	      
+	      //if j==ActiveSystems[J] loop end
+	    }
+	    
+	    //J for loop end
+	  } 
+	  //j for loop end
+	}
+
+
+
+	//if(i==I) end
+      }
+      //inner for loop  end
+    }
+    //outer for loop end
+  }
+  
+
+      
+}

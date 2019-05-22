@@ -76,9 +76,9 @@ namespace elasticity1
       nodal_solution_names.push_back("u"); nodal_data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
     }
     //
-    nodal_solution_names_L2.push_back("Ep11"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
-    nodal_solution_names_L2.push_back("Ep22"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
-    if (dim==3) {nodal_solution_names_L2.push_back("Ep33"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);}
+    nodal_solution_names_L2.push_back("Gamma1"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
+    nodal_solution_names_L2.push_back("Gamma2"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
+    if (dim==3) {nodal_solution_names_L2.push_back("Gamma3"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);}
   }
   
   template <int dim>
@@ -107,32 +107,23 @@ namespace elasticity1
     VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints2, uBCX1);
     */
     
-    /*
-   for shear un comment this 
-   std::vector<bool> uBCX0 (dim, true); //uBCX0[0]=true;
-   VectorTools::interpolate_boundary_values (dof_handler, 0, ZeroFunction<dim>(dim), constraints, uBCX0);
-   VectorTools::interpolate_boundary_values (dof_handler, 0, ZeroFunction<dim>(dim), constraints2, uBCX0);*/
     
-   /* std::vector<bool> uBCY0 (dim, false);// uBCY0[1]=true;//for shear comment this
-   VectorTools::interpolate_boundary_values (dof_handler, 2, ZeroFunction<dim>(dim), constraints, uBCY0);
-   VectorTools::interpolate_boundary_values (dof_handler, 2, ZeroFunction<dim>(dim), constraints2, uBCY0);*/
-   if (dim==3) {
-     /*std::vector<bool> uBCZ0 (dim, false); uBCZ0[2]=true;//for shear comment this
-     VectorTools::interpolate_boundary_values (dof_handler, 4, ZeroFunction<dim>(dim), constraints, uBCZ0);
-     VectorTools::interpolate_boundary_values (dof_handler, 4, ZeroFunction<dim>(dim), constraints2, uBCZ0);*/
-   }
-   /*
-   //for shear uncomment this
-   std::vector<bool> uBCX1 (dim, true); uBCX1[2]=false;
-   VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints, uBCX1);
-   VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints2, uBCX1);*/
-   //
-   /*
-   for shear un comment this
-   std::vector<bool> uBCX1Z (dim, false); uBCX1Z[2]=true;
-   VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.01, dim), constraints, uBCX1Z);
-   VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints2, uBCX1Z);*/
-   //
+    //for shear uncomment this
+    /*
+    std::vector<bool> uBCX0 (dim, true); //uBCX0[0]=true;
+    VectorTools::interpolate_boundary_values (dof_handler, 0, ZeroFunction<dim>(dim), constraints, uBCX0);
+    VectorTools::interpolate_boundary_values (dof_handler, 0, ZeroFunction<dim>(dim), constraints2, uBCX0);
+     
+    
+    // for simple shear uncomment this
+    std::vector<bool> uBCX1Z (dim, false); uBCX1Z[2]=true;
+    VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.01, dim), constraints, uBCX1Z);
+    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints2, uBCX1Z);
+    
+    // for pure shear uncomment this
+    std::vector<bool> uBCX1Y (dim, true); uBCX1Z[2]=false;
+    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints, uBCX1Y);
+    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints2, uBCX1Y);*/
 
    //simple tension boundary condition
    std::vector<bool> uBCX0 (dim, false); uBCX0[0]=true;
@@ -146,14 +137,19 @@ namespace elasticity1
      VectorTools::interpolate_boundary_values (dof_handler, 4, ZeroFunction<dim>(dim), constraints, uBCZ0);
      VectorTools::interpolate_boundary_values (dof_handler, 4, ZeroFunction<dim>(dim), constraints2, uBCZ0);
    }
-   std::vector<bool> uBCX1 (dim, false); uBCX1[0]=true; 
-   VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0005, dim), constraints, uBCX1);
+   std::vector<bool> uBCX1 (dim, false); uBCX1[0]=true;
+   if (currentTime<0.1){
+     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0001, dim), constraints, uBCX1);
+   }
+   else{
+     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0001, dim), constraints, uBCX1);
+   }
    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints2, uBCX1);
    
    constraints.close ();
    constraints2.close ();    
    constraints_L2.close (); 
-  }
+   }
   
   //Setup
   template <int dim>
@@ -199,21 +195,22 @@ namespace elasticity1
       if (cell->is_locally_owned()){
 	for (unsigned int q=0; q<fe_values.n_quadrature_points; q++){
 	  history[cell].push_back(new historyVariables<dim>); //create histroy variables object at each quad point of the cell.
-	  history[cell].back()->RefIncrement=0;
+	  for(unsigned int i=0;i<n_slip_systems;i++){
+	    history[cell].back()->CRSS[i]=0.0016;
+	    history[cell].back()->CRSS_iteration[i]=0.0016;
+	    history[cell].back()->Gamma_iteration[i]=0.;
+	    history[cell].back()->Gamma[i]=0.;
+	    history[cell].back()->shear_Stress_iteration[i]=0.;
+	    history[cell].back()->shear_Stress[i]=0.;
+	    history[cell].back()->Gamma_total[i]=0.;
+	  }
 	  for(unsigned int i=0;i<dim;i++)
-	    {
-	      history[cell].back()->RefIncrement=0.0;
+	    {   
 	      for(unsigned int j=0;j<dim;j++)
-		{
-		  history[cell].back()->F_previous(i,j)=(i==j);
-		  history[cell].back()->F_previousIteration(i,j)=(i==j);
+		{	 
 		  history[cell].back()->Fp_previous(i,j)=(i==j);
 		  history[cell].back()->Fp_previousIteration(i,j)=(i==j);
-		  history[cell].back()->Fe_previous(i,j)=(i==j);
-		  history[cell].back()->Fe_previousIteration(i,j)=(i==j);
-		  history[cell].back()->Dp_previous(i,j)=0.;
-		  history[cell].back()->Dp_previousIteration(i,j)=0.;
-		  history[cell].back()->RefStress(i,j)=0.;
+		  
 		}
 	    }
 	}
@@ -227,7 +224,7 @@ namespace elasticity1
     TimerOutput::Scope t(computing_timer, "assembly");
     system_rhs=0.0; system_matrix=0.0;
     const QGauss<dim>  quadrature_formula(3);
-    const QGauss<dim-1>	face_quadrature_formula (2);
+    const QGauss<dim-1>	face_quadrature_formula (3);
     FEValues<dim> fe_values (fe, quadrature_formula,
                              update_values    |  update_gradients |
                              update_quadrature_points |
@@ -298,10 +295,10 @@ namespace elasticity1
 	  for(unsigned int i=0;i<dofs_per_cell;i++){
 	    const unsigned int ci = fe_values.get_fe().system_to_component_index(i).first;
 	    if (ci==0){
-	      local_rhs(i)+= fe_values.shape_value(i,q)*history[cell][q]->elasStrain11*fe_values.JxW(q);
+	      local_rhs(i)+= fe_values.shape_value(i,q)*history[cell][q]->Gamma[0]*fe_values.JxW(q);
 	    }
 	    else if (ci==1){
-	      local_rhs(i)+= fe_values.shape_value(i,q)*history[cell][q]->elasStrain22*fe_values.JxW(q);
+	      local_rhs(i)+= fe_values.shape_value(i,q)*history[cell][q]->Gamma[1]*fe_values.JxW(q);
 	    }
 	    for(unsigned int j=0;j<dofs_per_cell;j++){
 	      const unsigned int cj = fe_values.get_fe().system_to_component_index(j).first;
@@ -466,7 +463,7 @@ namespace elasticity1
       applyBoundaryConditions(currentIncrement);
       solve();
       output_results(currentIncrement);
-      l2_projection();
+      //l2_projection();
       pcout << std::endl;
     }
     //computing_timer.print_summary ();
