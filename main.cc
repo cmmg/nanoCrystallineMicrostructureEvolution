@@ -29,6 +29,7 @@ namespace elasticity1
     void setup_system ();
     void assemble_system ();
     void solveIteration (bool isProject=false);
+    void grain_generation();
     void solve ();
     void refine_grid ();
     void output_results (const unsigned int increment, bool isProject=false);
@@ -46,7 +47,7 @@ namespace elasticity1
     LA::MPI::Vector                           system_rhs;
     ConditionalOStream                        pcout;
     TimerOutput                               computing_timer;
-
+    std::vector<Point<dim> >                  grain_seeds;
     //solution variables
     unsigned int currentIncrement, currentIteration;
     double totalTime, currentTime, dt;
@@ -139,10 +140,10 @@ namespace elasticity1
    }
    std::vector<bool> uBCX1 (dim, false); uBCX1[0]=true;
    if (currentTime<0.1){
-     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0001, dim), constraints, uBCX1);
+     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.001, dim), constraints, uBCX1);
    }
    else{
-     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0001, dim), constraints, uBCX1);
+     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.001, dim), constraints, uBCX1);
    }
    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints2, uBCX1);
    
@@ -150,7 +151,21 @@ namespace elasticity1
    constraints2.close ();    
    constraints_L2.close (); 
    }
-  
+  //grain id generation
+  template<int dim>
+  void elasticity<dim>::grain_generation(){
+    std::srand(5);
+    for(unsigned int I=0;I<n_seed_points;I++){
+      Point<dim> grain_id;
+      grain_id[0]=((double)(std::rand()%100)/100)-0.5;
+      grain_id[1]=((double)(std::rand()%100)/100)-0.5;
+      grain_id[2]=((double)(std::rand()%100)/100)-0.5;
+      //std::cout<<grain_id[0]<<" "<<grain_id[1]<<" "<<grain_id[2]<<"\n";
+      grain_seeds.push_back(grain_id);
+    }
+    //exit(-1);
+    
+  }
   //Setup
   template <int dim>
   void elasticity<dim>::setup_system (){
@@ -195,6 +210,8 @@ namespace elasticity1
       if (cell->is_locally_owned()){
 	for (unsigned int q=0; q<fe_values.n_quadrature_points; q++){
 	  history[cell].push_back(new historyVariables<dim>); //create histroy variables object at each quad point of the cell.
+	  //history[cell].back()->Grain_Id=0;
+	  //history[cell].back()->orientationAngle=0;
 	  for(unsigned int i=0;i<n_slip_systems;i++){
 	    history[cell].back()->CRSS[i]=0.0016;
 	    history[cell].back()->CRSS_iteration[i]=0.0016;
@@ -254,7 +271,7 @@ namespace elasticity1
 	
 	//populate residual vector
 	//pasing a reference of map to residual function in order to store all stress, strain, back_stress, slip_rate at current cell
-	residualForMechanics(fe_values, 0, ULocal, ULocalConv, defMap, currentIteration, currentIncrement, history[cell], local_rhs, local_matrix);
+	residualForMechanics(fe_values, 0, ULocal, ULocalConv, defMap, currentIteration, currentIncrement, history[cell], local_rhs, local_matrix,grain_seeds);
 
 	// 
 	if ((currentIteration==0)){
@@ -295,7 +312,7 @@ namespace elasticity1
 	  for(unsigned int i=0;i<dofs_per_cell;i++){
 	    const unsigned int ci = fe_values.get_fe().system_to_component_index(i).first;
 	    if (ci==0){
-	      local_rhs(i)+= fe_values.shape_value(i,q)*history[cell][q]->Gamma[0]*fe_values.JxW(q);
+	      local_rhs(i)+=fe_values.shape_value(i,q)*(history[cell][q]->Grain_Id)*fe_values.JxW(q);
 	    }
 	    else if (ci==1){
 	      local_rhs(i)+= fe_values.shape_value(i,q)*history[cell][q]->Gamma[1]*fe_values.JxW(q);
@@ -317,6 +334,10 @@ namespace elasticity1
 
     //solve
     solveIteration(true);
+
+    //
+    pcout << "L2 projection ccomplete\n";
+    pcout << U_L2.l2_norm() << "\n";
   }
 
   //Solve
@@ -400,9 +421,8 @@ namespace elasticity1
     TimerOutput::Scope t(computing_timer, "output");
     DataOut<dim> data_out;
     data_out.attach_dof_handler (dof_handler);
-    data_out.add_data_vector (UnGhost, nodal_solution_names, DataOut<dim>::type_dof_data, nodal_data_component_interpretation);    
+    data_out.add_data_vector (UnGhost, nodal_solution_names, DataOut<dim>::type_dof_data, nodal_data_component_interpretation);
     data_out.add_data_vector (UGhost_L2, nodal_solution_names_L2, DataOut<dim>::type_dof_data, nodal_data_component_interpretation_L2);
-    
     Vector<float> subdomain (triangulation.n_active_cells());
     for (unsigned int i=0; i<subdomain.size(); ++i)
       subdomain(i) = triangulation.locally_owned_subdomain();
@@ -440,6 +460,7 @@ namespace elasticity1
     //setup problem geometry and mesh
     GridGenerator::hyper_cube (triangulation, -problemWidth/2.0, problemWidth/2.0, true);
     triangulation.refine_global (refinementFactor);
+    grain_generation();
     setup_system ();
     pcout << "   Number of active cells:       "
 	  << triangulation.n_global_active_cells()
@@ -462,8 +483,8 @@ namespace elasticity1
       currentIncrement++;
       applyBoundaryConditions(currentIncrement);
       solve();
+      l2_projection();
       output_results(currentIncrement);
-      //l2_projection();
       pcout << std::endl;
     }
     //computing_timer.print_summary ();
