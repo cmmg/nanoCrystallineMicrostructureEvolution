@@ -48,6 +48,7 @@ namespace elasticity1
     ConditionalOStream                        pcout;
     TimerOutput                               computing_timer;
     std::vector<Point<dim> >                  grain_seeds;
+    std::vector<unsigned int>                 grain_ID;
     //solution variables
     unsigned int currentIncrement, currentIteration;
     double totalTime, currentTime, dt;
@@ -140,10 +141,10 @@ namespace elasticity1
    }
    std::vector<bool> uBCX1 (dim, false); uBCX1[0]=true;
    if (currentTime<0.1){
-     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.001, dim), constraints, uBCX1);
+     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0001, dim), constraints, uBCX1);
    }
    else{
-     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.001, dim), constraints, uBCX1);
+     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0005, dim), constraints, uBCX1);
    }
    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints2, uBCX1);
    
@@ -154,18 +155,51 @@ namespace elasticity1
   //grain id generation
   template<int dim>
   void elasticity<dim>::grain_generation(){
-    std::srand(5);
+
     for(unsigned int I=0;I<n_seed_points;I++){
       Point<dim> grain_id;
-      grain_id[0]=((double)(std::rand()%100)/100)-0.5;
-      grain_id[1]=((double)(std::rand()%100)/100)-0.5;
-      grain_id[2]=((double)(std::rand()%100)/100)-0.5;
+      std::srand(5.2*I);
+      grain_id[0]=((double)((std::rand())%100)/100)-0.5;
+      grain_id[1]=((double)((std::rand())%100)/100)-0.5;
+      grain_id[2]=((double)((std::rand())%100)/100)-0.5;
       //std::cout<<grain_id[0]<<" "<<grain_id[1]<<" "<<grain_id[2]<<"\n";
       grain_seeds.push_back(grain_id);
     }
-    //exit(-1);
+    for(unsigned int i=0;i<n_seed_points;i++){
+      if(i<n_diff_grains)grain_ID.push_back(i);
+      else{
+	Table<1, double> distance(i),temp_d(i);unsigned int var,findid_j, findid_k;
+	for(unsigned int j=0;j<i;j++){
+	  distance[j]=grain_seeds[i].distance(grain_seeds[j]);
+	  temp_d[j]=distance[j];
+	}
+	for(unsigned int j=0;j<i;j++){
+	  for(unsigned int k=0;k<i;k++){
+	    if(temp_d[k]>temp_d[j]){double t=temp_d[k];temp_d[k]=temp_d[j];temp_d[j]=t;}
+	  }
+	}
+	for(unsigned int j=0;j<i;j++){ 
+	  var=0;
+	  for(unsigned int l=0;l<i;l++){if(temp_d[i-1-j]==distance[l])findid_j=grain_ID[l]; }
+	  for(unsigned int k=0;k<n_diff_grains-1;k++){
+	    for(unsigned int l=0;l<i;l++)if(temp_d[k]==distance[l])findid_k=grain_ID[l]; 
+	    if(findid_j==findid_k){var=1;break;}
+	  }
+	  if(var==1)continue;
+	  else{grain_ID.push_back(findid_j);break;}
+	}
+	//else ends
+      }
+    }
+    /* for(unsigned int i=0;i<n_seed_points;i++){
+      std::cout<<grain_seeds[i][0]<<" "<<grain_seeds[i][2]<<" "<<grain_seeds[i][2]<<" "<<grain_ID[i]<<"\n";
+    }
+    exit(-1);*/
+
     
   }
+
+
   //Setup
   template <int dim>
   void elasticity<dim>::setup_system (){
@@ -271,7 +305,7 @@ namespace elasticity1
 	
 	//populate residual vector
 	//pasing a reference of map to residual function in order to store all stress, strain, back_stress, slip_rate at current cell
-	residualForMechanics(fe_values, 0, ULocal, ULocalConv, defMap, currentIteration, currentIncrement, history[cell], local_rhs, local_matrix,grain_seeds);
+	residualForMechanics(fe_values, 0, ULocal, ULocalConv, defMap, currentIteration, currentIncrement, history[cell], local_rhs, local_matrix,grain_seeds,grain_ID);
 
 	// 
 	if ((currentIteration==0)){
@@ -304,7 +338,7 @@ namespace elasticity1
     for (; cell!=endc; ++cell)
       if (cell->is_locally_owned()){
 	fe_values.reinit (cell);
-	local_matrix = 0; local_rhs = 0; 
+	local_matrix = 0.0; local_rhs = 0.0; 
 	cell->get_dof_indices (local_dof_indices);
 	
 	//implement L2 projection
@@ -315,17 +349,18 @@ namespace elasticity1
 	      local_rhs(i)+=fe_values.shape_value(i,q)*(history[cell][q]->Grain_Id)*fe_values.JxW(q);
 	    }
 	    else if (ci==1){
-	      local_rhs(i)+= fe_values.shape_value(i,q)*history[cell][q]->Gamma[1]*fe_values.JxW(q);
+	      local_rhs(i)+= fe_values.shape_value(i,q)*history[cell][q]->Gamma[0]*fe_values.JxW(q);
 	    }
 	    for(unsigned int j=0;j<dofs_per_cell;j++){
 	      const unsigned int cj = fe_values.get_fe().system_to_component_index(j).first;
 	      if (ci==cj){
 		local_matrix(i,j)+= fe_values.shape_value(i,q)*fe_values.shape_value(j,q)*fe_values.JxW(q);
+		//local_matrix(i,j)+=std::pow(i,j);
 	      }
 	    }
 	  }
 	}
-	   
+	
 	//assemble
 	constraints_L2.distribute_local_to_global (local_matrix, local_rhs, local_dof_indices, mass_matrix, system_rhs);
       }
@@ -334,10 +369,9 @@ namespace elasticity1
 
     //solve
     solveIteration(true);
-
+   
     //
-    pcout << "L2 projection ccomplete\n";
-    pcout << U_L2.l2_norm() << "\n";
+    
   }
 
   //Solve
@@ -395,7 +429,7 @@ namespace elasticity1
   //Solve
   template <int dim>
   void elasticity<dim>::solve(){
-    double res=1, tol=1.0e-12, abs_tol=1.0e-14, initial_norm=0, current_norm=0;
+    double res=1, tol=1.0e-8, abs_tol=1.0e-14, initial_norm=0, current_norm=0;
     double machineEPS=1.0e-15;
     currentIteration=0;
     char buffer[200];
@@ -411,6 +445,7 @@ namespace elasticity1
       solveIteration();
       U+=dU; UGhost=U; 
       ++currentIteration;
+      //break;
     }
     Un=U; UnGhost=Un;
   }
