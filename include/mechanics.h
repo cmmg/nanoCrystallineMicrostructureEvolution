@@ -22,6 +22,7 @@ public:
   Table<1, double> Gamma,Gamma_iteration,Gamma_total ;
   Table<1, double>shear_Stress, shear_Stress_iteration;
   dealii::FullMatrix<double> Fp_previous, Fp_previousIteration;
+  double vonMissesStress, vonMissesStrain;
 };
 
 template<int dim>
@@ -400,11 +401,7 @@ template <class T, int dim>
   for(unsigned int I=0;I<_ActiveSystems.size();I++){
     ActiveSystems[I]=_ActiveSystems[I];
   }
-  /*if(currentIteration==0 && q==0){
-    std::cout<<"shear at begining\n";
-    for(int i=0;i<n_slip_systems;i++)std::cout<<shearStress[i]<<" ";
-    std::cout<<"\n\n";
-    }*/
+ 
   unsigned int size=ActiveSystems.size();
   unsigned int cntr=0;
   for(unsigned int i=0;i<dim;i++)
@@ -657,7 +654,26 @@ template <class T, int dim>
    
     //plasticity if ends
   }
+
+  Table<2, double> smallStrain(dim, dim);
+  for(unsigned int i=0;i<dim;i++)
+    for(unsigned int j=0;j<dim;j++)
+      smallStrain[i][j]=0.;
+  for(int i=0;i<dim;i++)
+    for(int j=0;j<dim;j++){
+      smallStrain[i][j]=0.5*(F(i,j)+F(j,i))-(double)(i==j);
+    }
+  double exx=0.,eyy=0.,ezz=0.,gxy=0., gyz=0., gzx=0.;
+  exx=(2/3)*smallStrain[0][0]-(1/3)*smallStrain[1][1]-(1/3)*smallStrain[2][2];
+  eyy=(2/3)*smallStrain[1][1]-(1/3)*smallStrain[0][0]-(1/3)*smallStrain[2][2];
+  ezz=(2/3)*smallStrain[2][2]-(1/3)*smallStrain[1][1]-(1/3)*smallStrain[0][0];
+  gxy=2*smallStrain[0][1]; gyz=2*smallStrain[1][2]; gzx=2*smallStrain[2][0];
   
+  history[q]->vonMissesStrain=(2./3.)*std::pow( ( 1.5*(exx*exx+eyy*eyy+ezz*ezz) + 0.75*(gxy*gxy+gyz*gyz+gzx*gzx) ) ,0.5);
+    
+  
+  history[q]->vonMissesStress=0.5*(std::pow((CauchyStress[0][0]-CauchyStress[1][1]),2)+std::pow((CauchyStress[1][1]-CauchyStress[2][2]),2)+std::pow((CauchyStress[2][2]-CauchyStress[0][0]),2))+3*(std::pow(CauchyStress[0][1],2)+std::pow(CauchyStress[1][2],2)+std::pow(CauchyStress[2][0],2));
+  history[q]->vonMissesStress=std::pow(history[q]->vonMissesStress,0.5);
   
   for(unsigned int i=0;i<n_slip_systems;i++){
     history[q]->CRSS_iteration[i]=crss[i];

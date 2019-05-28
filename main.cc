@@ -1,3 +1,4 @@
+
 //
 //Computational Mechanics and Multiphysics Group @ UW-Madison
 //Basic framework for Finite Strain Elasticity
@@ -78,8 +79,8 @@ namespace elasticity1
       nodal_solution_names.push_back("u"); nodal_data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
     }
     //
-    nodal_solution_names_L2.push_back("Gamma1"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
-    nodal_solution_names_L2.push_back("Gamma2"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
+    nodal_solution_names_L2.push_back("Grain_Id"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
+    nodal_solution_names_L2.push_back("VonMissesStrain"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
     if (dim==3) {nodal_solution_names_L2.push_back("Gamma3"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);}
   }
   
@@ -349,7 +350,7 @@ namespace elasticity1
 	      local_rhs(i)+=fe_values.shape_value(i,q)*(history[cell][q]->Grain_Id)*fe_values.JxW(q);
 	    }
 	    else if (ci==1){
-	      local_rhs(i)+= fe_values.shape_value(i,q)*history[cell][q]->Gamma[0]*fe_values.JxW(q);
+	      local_rhs(i)+= fe_values.shape_value(i,q)*history[cell][q]->vonMissesStrain*fe_values.JxW(q);
 	    }
 	    for(unsigned int j=0;j<dofs_per_cell;j++){
 	      const unsigned int cj = fe_values.get_fe().system_to_component_index(j).first;
