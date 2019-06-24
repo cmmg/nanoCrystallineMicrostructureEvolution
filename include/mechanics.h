@@ -299,7 +299,6 @@ template <class T, int dim>
       double angle=0.;
       assign_grain_id<dim>(fe_values,grain_seeds,q,grain_id,angle,grain_ID);
       history[q]->Grain_Id=grain_id+1;
-      //std::cout<<history[q]->Grain_Id<<" ";
       history[q]->orientationAngle=angle;
     }
     history[q]->Fp_previous=history[q]->Fp_previousIteration;
@@ -326,12 +325,22 @@ template <class T, int dim>
   Table<2, double> slip_normal(n_slip_systems, dim);
   Table<2, double> slip_direction(n_slip_systems, dim);
   /*declare slip plane normals and slip directions*/
- 
+
+
+  //for shear independent indendent slip systems
+  /*slip_normal[0][0]=0.577;    slip_normal[0][1]=0.577;    slip_normal[0][2]=0.577; slip_direction[0][0]=0.707;  slip_direction[0][1]=-0.707;   slip_direction[0][2]=0.0;
+    slip_normal[1][0]=-0.577;   slip_normal[1][1]=0.577;    slip_normal[1][2]=0.577; slip_direction[1][0]=0.0;    slip_direction[1][1]=0.707;    slip_direction[1][2]=-0.707;*/
+  
+  //for tension test independent slip systems
   slip_normal[0][0]=0.577;    slip_normal[0][1]=0.577;    slip_normal[0][2]=0.577; slip_direction[0][0]=0.707;  slip_direction[0][1]=-0.707;   slip_direction[0][2]=0.0;
-  /*slip_normal[1][0]=-0.577;   slip_normal[1][1]=-0.577;   slip_normal[1][2]=0.577; slip_direction[1][0]=-0.707; slip_direction[1][1]=0.707;    slip_direction[1][2]=0.0;
+  slip_normal[1][0]=-0.577;   slip_normal[1][1]=-0.577;   slip_normal[1][2]=0.577; slip_direction[1][0]=-0.707; slip_direction[1][1]=0.707;    slip_direction[1][2]=0.0;
   slip_normal[2][0]=-0.577;   slip_normal[2][1]=0.577;    slip_normal[2][2]=0.577; slip_direction[2][0]=0.0;    slip_direction[2][1]=0.707;    slip_direction[2][2]=-0.707;
-  slip_normal[3][0]=0.577;    slip_normal[3][1]=-0.577;   slip_normal[3][2]=0.577; slip_direction[3][0]=0.0;    slip_direction[3][1]=-0.707;   slip_direction[3][2]=-0.707;*/
-  /*slip_normal[1][0]=0.577;    slip_normal[1][1]=0.577;    slip_normal[1][2]=0.577; slip_direction[1][0]=-0.707; slip_direction[1][1]=0.0;      slip_direction[1][2]=0.707;
+  slip_normal[3][0]=0.577;    slip_normal[3][1]=-0.577;   slip_normal[3][2]=0.577; slip_direction[3][0]=0.0;    slip_direction[3][1]=-0.707;   slip_direction[3][2]=-0.707;
+
+
+  /*
+  slip_normal[0][0]=0.577;    slip_normal[0][1]=0.577;    slip_normal[0][2]=0.577; slip_direction[0][0]=0.707;  slip_direction[0][1]=-0.707;   slip_direction[0][2]=0.0;
+  slip_normal[1][0]=0.577;    slip_normal[1][1]=0.577;    slip_normal[1][2]=0.577; slip_direction[1][0]=-0.707; slip_direction[1][1]=0.0;      slip_direction[1][2]=0.707;
   slip_normal[2][0]=0.577;    slip_normal[2][1]=0.577;    slip_normal[2][2]=0.577; slip_direction[2][0]=0.0;    slip_direction[2][1]=0.707;    slip_direction[2][2]=-0.707;
   slip_normal[3][0]=-0.577;   slip_normal[3][1]=0.577;    slip_normal[3][2]=0.577; slip_direction[3][0]=0.707;  slip_direction[3][1]=0.0;      slip_direction[3][2]=0.707;
   slip_normal[4][0]=-0.577;   slip_normal[4][1]=0.577;    slip_normal[4][2]=0.577; slip_direction[4][0]=-0.707; slip_direction[4][1]=-0.707;   slip_direction[4][2]=0.0;
@@ -364,11 +373,7 @@ template <class T, int dim>
   double theta=0.0;
   Table<2, double> Identity(dim, dim);
 
-  
- 
- 
-  crystal_rotation<dim>(slip_normal, slip_direction,history[q]->orientationAngle);
-
+  // crystal_rotation<dim>(slip_normal, slip_direction,history[q]->orientationAngle);
   
   //define ElasticModulii
   for(unsigned int i=0;i<dim;i++)
@@ -377,7 +382,7 @@ template <class T, int dim>
 	for(unsigned int l=0;l<dim;l++){
 	  ElasticModulii[i][j][k][l]=lambda*(i==j)*(k==l) + mu*((i==k)*(j==l) + (i==l)*(j==k));
 	}
-
+	
       }
   
   /*calculate deformation gradient*/
@@ -387,6 +392,7 @@ template <class T, int dim>
     }
   }
   for(unsigned int i=0;i<n_slip_systems;i++){
+    crss[i]=0.;
     crss[i]=history[q]->CRSS[i];
   }
   Fp=history[q]->Fp_previous;
@@ -413,17 +419,16 @@ template <class T, int dim>
 	      for(unsigned int l=0;l<dim;l++)
 		for(unsigned int L=0;L<dim;L++)
 		  C[i][j][k][l]+=F(i,I)*F(j,J)*F(k,K)*F(l,L)*ElasticModulii[I][J][K][L];
-
-
- 
+  
+  
+  
   unsigned int whilecounter=0;
-   Vector<double> gamma_total(n_slip_systems);
+  Vector<double> gamma_total(n_slip_systems);
   if(size>0){
-    
     FullMatrix<double> active_system_matrix, active_system_inv;
     Vector<double> active_system_rhs;
     Vector<double> gamma;
-   
+    
     std::vector<int> tempv;
     Table<2, double>B_mult_SPK(dim, dim), C_B_beta(dim, dim), RCB(dim, dim), temp(dim, dim), B_beta(dim, dim);
     Table<4,double>variation_Fp(dim, dim, dim, dim),variation_Fe(dim, dim, dim, dim), variation_E(dim, dim, dim, dim),variation_SPK(dim, dim, dim, dim), ElastoPlasticModulii(dim, dim, dim, dim);
@@ -448,7 +453,10 @@ template <class T, int dim>
     // put a loop to check for yield surface criterion
     while(flag1==1) {
       flag=1;
+      unsigned int innerwhilecount=0;
       while(flag==1){//loop for calculating gamma---- removing negative slips
+	innerwhilecount++;
+       
 	active_system_matrix.reinit(size,size); active_system_inv.reinit(size, size);
 	active_system_rhs.reinit(size); gamma.reinit(size);
 	active_system_matrix=0.;active_system_inv=0.;
@@ -524,6 +532,7 @@ template <class T, int dim>
 	    cntr++;tempv.push_back(ActiveSystems[I]);
 	   
 	  }//cntr counts no of +ve gamma values
+	  
 	}
 	
 	if(cntr<size && cntr!=0){ //cntr==size-> no negative gamma values, and cntr=0-> all negative gamma
@@ -535,6 +544,7 @@ template <class T, int dim>
 	else{flag=0;}
 	
 	//inner while loop end
+	//	if(currentIncrement==3&&currentIteration==1)std::cout<<"inner"<<innerwhilecount<<" ";
       }
       
 
@@ -646,9 +656,7 @@ template <class T, int dim>
       
       //if all gamma negative then move so outer while ends
       else{flag1=0;}
-      whilecounter++;
-      
-      
+      whilecounter++;//if(currentIncrement==3&&currentIteration==1){for(unsigned int i=0;i<n_slip_systems;i++)std::cout<<shearStress[i]<<" ";std::cout<<"outerwhile"<<whilecounter<<" quadpoint "<<q<<" ";}
       //outer while    for consistency condition
     }
    

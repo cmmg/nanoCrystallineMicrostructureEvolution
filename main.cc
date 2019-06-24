@@ -112,23 +112,39 @@ namespace elasticity1
     
     
     //for shear uncomment this
-    /*
-    std::vector<bool> uBCX0 (dim, true); //uBCX0[0]=true;
+    
+    /* std::vector<bool> uBCX0 (dim, true); uBCX0[0]=true;
     VectorTools::interpolate_boundary_values (dof_handler, 0, ZeroFunction<dim>(dim), constraints, uBCX0);
     VectorTools::interpolate_boundary_values (dof_handler, 0, ZeroFunction<dim>(dim), constraints2, uBCX0);
+    std::vector<bool> uBCX1 (dim, true); uBCX1[2]=false;
+    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints, uBCX1);
+    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints2, uBCX1);
+    std::vector<bool> uBCX1Z (dim, false); uBCX1Z[2]=true;
+    VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0001, dim), constraints, uBCX1Z);
+    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints2, uBCX1Z);*/
+
+
+
      
     
     // for simple shear uncomment this
+    /*
     std::vector<bool> uBCX1Z (dim, false); uBCX1Z[2]=true;
-    VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.01, dim), constraints, uBCX1Z);
-    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints2, uBCX1Z);
-    
-    // for pure shear uncomment this
-    std::vector<bool> uBCX1Y (dim, true); uBCX1Z[2]=false;
+    VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0001, dim), constraints, uBCX1Z);
+    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints2, uBCX1Z);*/
+     
+
+
+
+
+    // for pure shear uncomment this    
+    /* std::vector<bool> uBCX1Y (dim, true); uBCX1Y[2]=false;
     VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints, uBCX1Y);
     VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints2, uBCX1Y);*/
 
+    
    //simple tension boundary condition
+    
    std::vector<bool> uBCX0 (dim, false); uBCX0[0]=true;
    VectorTools::interpolate_boundary_values (dof_handler, 0, ZeroFunction<dim>(dim), constraints, uBCX0);
    VectorTools::interpolate_boundary_values (dof_handler, 0, ZeroFunction<dim>(dim), constraints2, uBCX0);
@@ -139,7 +155,7 @@ namespace elasticity1
      std::vector<bool> uBCZ0 (dim, false); uBCZ0[2]=true;
      VectorTools::interpolate_boundary_values (dof_handler, 4, ZeroFunction<dim>(dim), constraints, uBCZ0);
      VectorTools::interpolate_boundary_values (dof_handler, 4, ZeroFunction<dim>(dim), constraints2, uBCZ0);
-   }
+     }
    std::vector<bool> uBCX1 (dim, false); uBCX1[0]=true;
    if (currentTime<0.1){
      VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0001, dim), constraints, uBCX1);
