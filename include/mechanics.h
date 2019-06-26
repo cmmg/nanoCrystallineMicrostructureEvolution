@@ -31,14 +31,6 @@ void assign_grain_id(FEValues<dim>&fe_values, std::vector<Point<dim> >&grain_see
    //std::cout<<quadPoint[0]<<" "<<quadPoint[1]<<" "<<quadPoint[2]<<"\n";
   //assign grain id to the quadrature point
   
-   /*grain_seeds[0][0]=-0.25;  grain_seeds[0][1]=0.25;   grain_seeds[0][2]=-0.25;
-   grain_seeds[1][0]=-0.25;  grain_seeds[1][1]=0.25;   grain_seeds[1][2]=0.25;
-   grain_seeds[2][0]=0.25;   grain_seeds[2][1]=-0.250;   grain_seeds[2][2]=-0.25;
-   grain_seeds[3][0]=0.25;   grain_seeds[3][1]=-0.250;  grain_seeds[3][2]=0.25;
-   /*grain_seeds[4][0]=-0.25;  grain_seeds[4][1]=-0.25;  grain_seeds[4][2]=0.25;
-   grain_seeds[5][0]=-0.25;  grain_seeds[5][1]=-0.25;  grain_seeds[5][2]=-0.25;
-   grain_seeds[6][0]=0.25;   grain_seeds[6][1]=0.25;   grain_seeds[6][2]=0.25;
-   grain_seeds[7][0]=0.25;   grain_seeds[7][1]=0.25;   grain_seeds[7][2]=-0.25;*/
    Table<1, double>distance(n_seed_points);
    for(unsigned int i=0;i<n_seed_points;i++){
      distance[i]=quadPoint.distance(grain_seeds[i]);
@@ -332,13 +324,13 @@ template <class T, int dim>
     slip_normal[1][0]=-0.577;   slip_normal[1][1]=0.577;    slip_normal[1][2]=0.577; slip_direction[1][0]=0.0;    slip_direction[1][1]=0.707;    slip_direction[1][2]=-0.707;*/
   
   //for tension test independent slip systems
-  slip_normal[0][0]=0.577;    slip_normal[0][1]=0.577;    slip_normal[0][2]=0.577; slip_direction[0][0]=0.707;  slip_direction[0][1]=-0.707;   slip_direction[0][2]=0.0;
+  /*slip_normal[0][0]=0.577;    slip_normal[0][1]=0.577;    slip_normal[0][2]=0.577; slip_direction[0][0]=0.707;  slip_direction[0][1]=-0.707;   slip_direction[0][2]=0.0;
   slip_normal[1][0]=-0.577;   slip_normal[1][1]=-0.577;   slip_normal[1][2]=0.577; slip_direction[1][0]=-0.707; slip_direction[1][1]=0.707;    slip_direction[1][2]=0.0;
   slip_normal[2][0]=-0.577;   slip_normal[2][1]=0.577;    slip_normal[2][2]=0.577; slip_direction[2][0]=0.0;    slip_direction[2][1]=0.707;    slip_direction[2][2]=-0.707;
-  slip_normal[3][0]=0.577;    slip_normal[3][1]=-0.577;   slip_normal[3][2]=0.577; slip_direction[3][0]=0.0;    slip_direction[3][1]=-0.707;   slip_direction[3][2]=-0.707;
+  slip_normal[3][0]=0.577;    slip_normal[3][1]=-0.577;   slip_normal[3][2]=0.577; slip_direction[3][0]=0.0;    slip_direction[3][1]=-0.707;   slip_direction[3][2]=-0.707;*/
 
 
-  /*
+  
   slip_normal[0][0]=0.577;    slip_normal[0][1]=0.577;    slip_normal[0][2]=0.577; slip_direction[0][0]=0.707;  slip_direction[0][1]=-0.707;   slip_direction[0][2]=0.0;
   slip_normal[1][0]=0.577;    slip_normal[1][1]=0.577;    slip_normal[1][2]=0.577; slip_direction[1][0]=-0.707; slip_direction[1][1]=0.0;      slip_direction[1][2]=0.707;
   slip_normal[2][0]=0.577;    slip_normal[2][1]=0.577;    slip_normal[2][2]=0.577; slip_direction[2][0]=0.0;    slip_direction[2][1]=0.707;    slip_direction[2][2]=-0.707;
@@ -350,7 +342,7 @@ template <class T, int dim>
   slip_normal[8][0]=0.577;    slip_normal[8][1]=-0.577;   slip_normal[8][2]=0.577; slip_direction[8][0]=0.707;  slip_direction[8][1]=0.707;    slip_direction[8][2]=0.0;
   slip_normal[9][0]=-0.577;   slip_normal[9][1]=-0.577;   slip_normal[9][2]=0.577; slip_direction[9][0]=-0.707; slip_direction[9][1]=0.707;    slip_direction[9][2]=0.0;
   slip_normal[10][0]=-0.577;  slip_normal[10][1]=-0.577;  slip_normal[10][2]=0.577;slip_direction[10][0]=0.707; slip_direction[10][1]=0.0;     slip_direction[10][2]=0.707;
-  slip_normal[11][0]=-0.577;  slip_normal[11][1]=-0.577;  slip_normal[11][2]=0.577;slip_direction[11][0]=0.0;   slip_direction[11][1]=-0.707;  slip_direction[11][2]=-0.707;*/
+  slip_normal[11][0]=-0.577;  slip_normal[11][1]=-0.577;  slip_normal[11][2]=0.577;slip_direction[11][0]=0.0;   slip_direction[11][1]=-0.707;  slip_direction[11][2]=-0.707;
 
  
  

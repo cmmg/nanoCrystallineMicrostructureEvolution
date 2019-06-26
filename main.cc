@@ -12,11 +12,41 @@
 #include "parameters.h"
 //physics headers
 #include "include/mechanics.h"
+#include "include/chemo.h"
 
 //Namespace
 namespace elasticity1
 {
   using namespace dealii;
+
+  template<int dim>
+  class InitialCondition: public Function<dim>{
+  public:
+    std::vector<Point<dim> >* grainPoints;
+    std::vector<unsigned int> * grainID;
+    InitialCondition(std::vector<Point<dim> >*_grainPoints, std::vector<unsigned int>*_grainId):Function<dim>(n_diff_grains), grainPoints(_grainPoints),grainID(_grainId){}
+    void vector_value(const Point<dim> &p, Vector<double>&values)const{
+      Assert(values.size()==n_diff_grains+dim, ExcDimensionMismatch(values.size(),n_diff_grains+dim));
+      // initial 3 components of values denote displacement, rest of the components denote phase field parameter
+      values(0)=0.;values(1)=0.; values(2)=0.;
+      Table<1, double> distance(n_seed_points);
+      for(unsigned int i=0;i<n_seed_points;i++){
+	distance[i]=p.distance((*grainPoints)[i]);
+      }
+      
+      int min=0;
+      for(unsigned int i=0;i<n_seed_points;i++){
+	if(distance[i]<distance[min])min=i;
+      }
+      unsigned int g_id=(*grainID)[min];
+      for(unsigned int i=0;i<n_diff_grains;i++){
+	if(i==g_id)values(dim+i)=1.0;
+	else values(dim+i)=0.;
+      }
+      
+    }
+  };
+  
   
   template <int dim>
   class elasticity{
@@ -66,7 +96,7 @@ namespace elasticity1
                    typename Triangulation<dim>::MeshSmoothing
                    (Triangulation<dim>::smoothing_on_refinement |
                     Triangulation<dim>::smoothing_on_coarsening)),
-    fe(FE_Q<dim>(1),DIMS),
+    fe(FE_Q<dim>(1), totalDOF),// change the degree of freedoms per node from displacement to displacement+grain_parameter
     dof_handler (triangulation),
     pcout (std::cout, (Utilities::MPI::this_mpi_process(mpi_communicator)== 0)),
     computing_timer (mpi_communicator, pcout, TimerOutput::summary, TimerOutput::wall_times){
@@ -145,18 +175,18 @@ namespace elasticity1
     
    //simple tension boundary condition
     
-   std::vector<bool> uBCX0 (dim, false); uBCX0[0]=true;
+   std::vector<bool> uBCX0 (totalDOF, false); uBCX0[0]=true;
    VectorTools::interpolate_boundary_values (dof_handler, 0, ZeroFunction<dim>(dim), constraints, uBCX0);
    VectorTools::interpolate_boundary_values (dof_handler, 0, ZeroFunction<dim>(dim), constraints2, uBCX0);
-   std::vector<bool> uBCY0 (dim, false); uBCY0[1]=true;
+   std::vector<bool> uBCY0 (totalDOF, false); uBCY0[1]=true;
    VectorTools::interpolate_boundary_values (dof_handler, 2, ZeroFunction<dim>(dim), constraints, uBCY0);
    VectorTools::interpolate_boundary_values (dof_handler, 2, ZeroFunction<dim>(dim), constraints2, uBCY0);
    if (dim==3) {
-     std::vector<bool> uBCZ0 (dim, false); uBCZ0[2]=true;
+     std::vector<bool> uBCZ0 (totalDOF, false); uBCZ0[2]=true;
      VectorTools::interpolate_boundary_values (dof_handler, 4, ZeroFunction<dim>(dim), constraints, uBCZ0);
      VectorTools::interpolate_boundary_values (dof_handler, 4, ZeroFunction<dim>(dim), constraints2, uBCZ0);
      }
-   std::vector<bool> uBCX1 (dim, false); uBCX1[0]=true;
+   std::vector<bool> uBCX1 (totalDOF, false); uBCX1[0]=true;
    if (currentTime<0.1){
      VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0001, dim), constraints, uBCX1);
    }
@@ -179,7 +209,7 @@ namespace elasticity1
       grain_id[0]=((double)((std::rand())%100)/100)-0.5;
       grain_id[1]=((double)((std::rand())%100)/100)-0.5;
       grain_id[2]=((double)((std::rand())%100)/100)-0.5;
-      //std::cout<<grain_id[0]<<" "<<grain_id[1]<<" "<<grain_id[2]<<"\n";
+      
       grain_seeds.push_back(grain_id);
     }
     for(unsigned int i=0;i<n_seed_points;i++){
@@ -208,14 +238,9 @@ namespace elasticity1
 	//else ends
       }
     }
-    /* for(unsigned int i=0;i<n_seed_points;i++){
-      std::cout<<grain_seeds[i][0]<<" "<<grain_seeds[i][2]<<" "<<grain_seeds[i][2]<<" "<<grain_ID[i]<<"\n";
-    }
-    exit(-1);*/
-
     
   }
-
+  
 
   //Setup
   template <int dim>
@@ -319,12 +344,28 @@ namespace elasticity1
 	//get defomration map
 	deformationMap<double, dim> defMap(n_q_points); 
 	getDeformationMap<double, dim>(fe_values, 0, ULocal, defMap, currentIteration);
-	
+	Table<1, Sacado::Fad::DFad<double> >R(dofs_per_cell);//for residual from allen cahn
+	for(unsigned int i=0;i<dofs_per_cell;i++){R[i]=0.0;}//for residual from allen cahn
 	//populate residual vector
 	//pasing a reference of map to residual function in order to store all stress, strain, back_stress, slip_rate at current cell
 	residualForMechanics(fe_values, 0, ULocal, ULocalConv, defMap, currentIteration, currentIncrement, history[cell], local_rhs, local_matrix,grain_seeds,grain_ID);
+	residualForChemo(fe_values, /*DOF*/0, fe_face_values, cell,  dt, ULocal, ULocalConv, R);
+	//update local_matrix and local rhs--> add chemo terms with mechanics terms
+	//note term associated only with 
+	for(unsigned int i=0;i<dofs_per_cell;i++){
+	  const unsigned int ci= fe_values.get_fe().system_to_component_index(i).first;
+	  if(ci>dim){
+	    local_rhs(i)+=-R[i].val();
+	    for(unsigned int j=0;j<dofs_per_cell;j++){
+	      const unsigned int cj= fe_values.get_fe().system_to_component_index(j).first;
+	      if(cj>dim){
+		local_matrix(i,j)+=R[i].fastAccessDx(j);
+	      }
+	    }
+	  }
+	}
 
-	// 
+	
 	if ((currentIteration==0)){
 	  constraints.distribute_local_to_global (local_matrix, local_rhs, local_dof_indices, system_matrix, system_rhs);
 	}
@@ -522,8 +563,8 @@ namespace elasticity1
 	  << std::endl;
     
     //setup initial conditions
-    //VectorTools::interpolate(dof_handler, InitalConditions<dim>(), U); Un=U;
-    U=0.0;
+    VectorTools::interpolate(dof_handler, InitialCondition<dim>(&grain_seeds, &grain_ID), U); Un=U;
+    //U=0.0;
     
     //sync ghost vectors to non-ghost vectors
     UGhost=U;  UnGhost=Un;
