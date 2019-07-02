@@ -324,14 +324,14 @@ template <class T, int dim>
     slip_normal[1][0]=-0.577;   slip_normal[1][1]=0.577;    slip_normal[1][2]=0.577; slip_direction[1][0]=0.0;    slip_direction[1][1]=0.707;    slip_direction[1][2]=-0.707;*/
   
   //for tension test independent slip systems
-  /*slip_normal[0][0]=0.577;    slip_normal[0][1]=0.577;    slip_normal[0][2]=0.577; slip_direction[0][0]=0.707;  slip_direction[0][1]=-0.707;   slip_direction[0][2]=0.0;
-  slip_normal[1][0]=-0.577;   slip_normal[1][1]=-0.577;   slip_normal[1][2]=0.577; slip_direction[1][0]=-0.707; slip_direction[1][1]=0.707;    slip_direction[1][2]=0.0;
-  slip_normal[2][0]=-0.577;   slip_normal[2][1]=0.577;    slip_normal[2][2]=0.577; slip_direction[2][0]=0.0;    slip_direction[2][1]=0.707;    slip_direction[2][2]=-0.707;
+  slip_normal[0][0]=0.577;    slip_normal[0][1]=0.577;    slip_normal[0][2]=0.577; slip_direction[0][0]=0.707;  slip_direction[0][1]=-0.707;   slip_direction[0][2]=0.0;
+  /* slip_normal[1][0]=-0.577;   slip_normal[1][1]=-0.577;   slip_normal[1][2]=0.577; slip_direction[1][0]=-0.707; slip_direction[1][1]=0.707;    slip_direction[1][2]=0.0;
+  /*slip_normal[2][0]=-0.577;   slip_normal[2][1]=0.577;    slip_normal[2][2]=0.577; slip_direction[2][0]=0.0;    slip_direction[2][1]=0.707;    slip_direction[2][2]=-0.707;
   slip_normal[3][0]=0.577;    slip_normal[3][1]=-0.577;   slip_normal[3][2]=0.577; slip_direction[3][0]=0.0;    slip_direction[3][1]=-0.707;   slip_direction[3][2]=-0.707;*/
 
 
   
-  slip_normal[0][0]=0.577;    slip_normal[0][1]=0.577;    slip_normal[0][2]=0.577; slip_direction[0][0]=0.707;  slip_direction[0][1]=-0.707;   slip_direction[0][2]=0.0;
+  /*slip_normal[0][0]=0.577;    slip_normal[0][1]=0.577;    slip_normal[0][2]=0.577; slip_direction[0][0]=0.707;  slip_direction[0][1]=-0.707;   slip_direction[0][2]=0.0;
   slip_normal[1][0]=0.577;    slip_normal[1][1]=0.577;    slip_normal[1][2]=0.577; slip_direction[1][0]=-0.707; slip_direction[1][1]=0.0;      slip_direction[1][2]=0.707;
   slip_normal[2][0]=0.577;    slip_normal[2][1]=0.577;    slip_normal[2][2]=0.577; slip_direction[2][0]=0.0;    slip_direction[2][1]=0.707;    slip_direction[2][2]=-0.707;
   slip_normal[3][0]=-0.577;   slip_normal[3][1]=0.577;    slip_normal[3][2]=0.577; slip_direction[3][0]=0.707;  slip_direction[3][1]=0.0;      slip_direction[3][2]=0.707;
@@ -342,7 +342,7 @@ template <class T, int dim>
   slip_normal[8][0]=0.577;    slip_normal[8][1]=-0.577;   slip_normal[8][2]=0.577; slip_direction[8][0]=0.707;  slip_direction[8][1]=0.707;    slip_direction[8][2]=0.0;
   slip_normal[9][0]=-0.577;   slip_normal[9][1]=-0.577;   slip_normal[9][2]=0.577; slip_direction[9][0]=-0.707; slip_direction[9][1]=0.707;    slip_direction[9][2]=0.0;
   slip_normal[10][0]=-0.577;  slip_normal[10][1]=-0.577;  slip_normal[10][2]=0.577;slip_direction[10][0]=0.707; slip_direction[10][1]=0.0;     slip_direction[10][2]=0.707;
-  slip_normal[11][0]=-0.577;  slip_normal[11][1]=-0.577;  slip_normal[11][2]=0.577;slip_direction[11][0]=0.0;   slip_direction[11][1]=-0.707;  slip_direction[11][2]=-0.707;
+  slip_normal[11][0]=-0.577;  slip_normal[11][1]=-0.577;  slip_normal[11][2]=0.577;slip_direction[11][0]=0.0;   slip_direction[11][1]=-0.707;  slip_direction[11][2]=-0.707;*/
 
  
  
@@ -365,7 +365,7 @@ template <class T, int dim>
   double theta=0.0;
   Table<2, double> Identity(dim, dim);
 
-  // crystal_rotation<dim>(slip_normal, slip_direction,history[q]->orientationAngle);
+   crystal_rotation<dim>(slip_normal, slip_direction,history[q]->orientationAngle);
   
   //define ElasticModulii
   for(unsigned int i=0;i<dim;i++)
@@ -387,6 +387,14 @@ template <class T, int dim>
     crss[i]=0.;
     crss[i]=history[q]->CRSS[i];
   }
+
+  /*if(currentIteration==1){
+    for(unsigned int i=0;i<dim;i++)
+      for(unsigned int j=0;j<dim;j++)
+	std::cout<<F(i,j)<<" ";
+    std::cout<<"\n";
+  }*/
+
   Fp=history[q]->Fp_previous;
   F_inv.invert(F);
   Fp_inv.invert(Fp);F_inv.invert(F);
@@ -692,7 +700,7 @@ template <class T, int dim>
 
 //mechanics residual implementation
 template <int dim>
-void residualForMechanics(FEValues<dim>& fe_values, unsigned int DOF, Table<1, double >& ULocal, Table<1, double>& ULocalConv, deformationMap<double, dim>& defMap, unsigned int currentIteration,unsigned int currentIncrement,  std::vector<historyVariables<dim>* >& history, Vector<double>& RLocal, FullMatrix<double>& KLocal,std::vector<Point<dim> >&grain_seeds,std::vector<unsigned int>&grain_ID){
+void residualForMechanics(FEValues<dim>& fe_values, unsigned int DOF, Table<1, double >& ULocal, Table<1, double >& ULocalConv, deformationMap<double, dim>& defMap, unsigned int currentIteration,unsigned int currentIncrement,  std::vector<historyVariables<dim>* >& history, Vector<double>& RLocal, FullMatrix<double>& KLocal,std::vector<Point<dim> >&grain_seeds,std::vector<unsigned int>&grain_ID){
   unsigned int dofs_per_cell= fe_values.dofs_per_cell;
   unsigned int n_q_points= fe_values.n_quadrature_points;
   

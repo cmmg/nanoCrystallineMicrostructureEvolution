@@ -1,13 +1,13 @@
 //problem geometry, mesh control
 #define DIMS 3
 #define problemWidth 1.0
-#define refinementFactor 5
+#define refinementFactor 0
 
 
 //mechanics properties
 #define elasticModulus 4.2//2.0e11
 #define PoissonsRatio 0.3
-#define TimeStep 0.1
+#define TimeStep 0.0001
 //time step controls
 
 #define TotalTime 1000*TimeStep
@@ -17,7 +17,7 @@
 
 
 //#define Yield_stress 0.1
-#define n_slip_systems 2
+#define n_slip_systems 1
 #define PI 3.14159265
 #define self_hardening  0.0180
 #define Ss 0.0148
