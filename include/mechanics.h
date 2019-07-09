@@ -364,8 +364,8 @@ template <class T, int dim>
   double det_F=0.;
   double theta=0.0;
   Table<2, double> Identity(dim, dim);
-
-   crystal_rotation<dim>(slip_normal, slip_direction,history[q]->orientationAngle);
+  
+  crystal_rotation<dim>(slip_normal, slip_direction,history[q]->orientationAngle);
   
   //define ElasticModulii
   for(unsigned int i=0;i<dim;i++)
