@@ -364,8 +364,8 @@ template <class T, int dim>
   double det_F=0.;
   double theta=0.0;
   Table<2, double> Identity(dim, dim);
-
-   crystal_rotation<dim>(slip_normal, slip_direction,history[q]->orientationAngle);
+  
+  crystal_rotation<dim>(slip_normal, slip_direction,history[q]->orientationAngle);
   
   //define ElasticModulii
   for(unsigned int i=0;i<dim;i++)
@@ -425,6 +425,7 @@ template <class T, int dim>
   unsigned int whilecounter=0;
   Vector<double> gamma_total(n_slip_systems);
   if(size>0){
+
     FullMatrix<double> active_system_matrix, active_system_inv;
     Vector<double> active_system_rhs;
     Vector<double> gamma;
@@ -719,7 +720,7 @@ void residualForMechanics(FEValues<dim>& fe_values, unsigned int DOF, Table<1, d
 	// R = Grad(w)*P
 	for (unsigned int j = 0; j<dim; j++){
 	  for (unsigned int J = 0; J<dim; J++){  
-	    RLocal(A) += -fe_values.shape_grad(A, q)[J]*invF[J][j]*(Piola_stress[i][J])*fe_values.JxW(q);
+	    RLocal(A) += fe_values.shape_grad(A, q)[J]*invF[J][j]*(Piola_stress[i][J])*fe_values.JxW(q);
 	  }
 	  //evaluate tangent
 	  for (unsigned int B=0; B<dofs_per_cell; B++) {   
