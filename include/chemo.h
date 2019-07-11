@@ -17,9 +17,9 @@ void residualForChemo(FEValues<dim>& fe_values, unsigned int dof, FEFaceValues<d
   
   //evaluate gradients 
  
-  Table<2,double > c(n_q_points,n_diff_grains);         
-  Table<3,double > c_j(n_q_points,n_diff_grains, dim);
-  Table<2,double >c_conv(n_q_points,n_diff_grains);
+  Table<2,double> c(n_q_points,n_diff_grains);         
+  Table<3,double> c_j(n_q_points,n_diff_grains, dim);
+  Table<2,double>c_conv(n_q_points,n_diff_grains);
  
   for (unsigned int q=0;q<n_q_points;q++) {
     for(unsigned int p=0;p<n_diff_grains;p++){
@@ -47,7 +47,6 @@ void residualForChemo(FEValues<dim>& fe_values, unsigned int dof, FEFaceValues<d
   for(unsigned int i=0; i<dofs_per_cell; i++){
     int ck=fe_values.get_fe().system_to_component_index(i).first - dof;
     if(ck>=0){
-     
       for(unsigned int q=0;q<n_q_points;q++){
 	double sq_sum=0.0;
 	for(long int p=0;p<n_diff_grains;p++){
@@ -57,11 +56,10 @@ void residualForChemo(FEValues<dim>& fe_values, unsigned int dof, FEFaceValues<d
 	local_rhs[i]+=(1.0/dt)*fe_values.shape_value(i,q)*(c[q][ck]-c_conv[q][ck])*fe_values.JxW(q);
 	local_rhs[i]-=L1*alpha1*fe_values.shape_value(i,q)*c_conv[q][ck]*fe_values.JxW(q);
 	local_rhs[i]+=L1*beta1*fe_values.shape_value(i,q)*(std::pow(c_conv[q][ck],3))*fe_values.JxW(q);
-	local_rhs[i]+=L1*2*gamma1*fe_values.shape_value(i,q)*c_conv[q][ck]*sq_sum*fe_values.JxW(q);	
-	//local_rhs[i]+=L1*(2*c_conv[q][ck]+4*pow(c_conv[q][ck],3)-6*pow(c_conv[q][ck],2))*fe_values.JxW(q);
+	local_rhs[i]+=L1*2*gamma1*fe_values.shape_value(i,q)*c_conv[q][ck]*sq_sum*fe_values.JxW(q);     
 	for(unsigned int j=0;j<dim;j++){
 	  double Kjj= Kappa[j];
-	  double kc_j= c_j[q][ck][j]*Kjj; // Kjj*C_j
+	  double kc_j= c_j[q][ck][j]*Kjj;
 	  local_rhs[i]+=L1*fe_values.shape_grad(i,q)[j]*kc_j*fe_values.JxW(q);
 	}
 	
@@ -73,23 +71,21 @@ void residualForChemo(FEValues<dim>& fe_values, unsigned int dof, FEFaceValues<d
   //find jacobian matrix
   for(unsigned int q=0;q<n_q_points;q++){
     for(unsigned int A=0;A<dofs_per_cell;A++){
-      int CA=fe_values.get_fe().system_to_component_index(A).first-dof;
-      if(CA>=0){
+      int ca=fe_values.get_fe().system_to_component_index(A).first-dof;
+      if(ca>=0){
 	for(unsigned int B=0;B<dofs_per_cell;B++){
-	  int CB=fe_values.get_fe().system_to_component_index(B).first-dof;
-	  if(CB==CA){	  
+	  int cb=fe_values.get_fe().system_to_component_index(B).first-dof;
+	  if(cb==ca){	  
 	    double sq_sum=0.;
 	    for(unsigned int p=0;p<n_diff_grains;p++){
-	      if(p==CB)continue;
+	      if(p==cb)continue;
 	      else sq_sum+=std::pow(c_conv[q][p],2);
-	      }
-	    local_matrix(A,B)+= fe_values.shape_value(A,q)*fe_values.shape_value(B,q)*((1.0/dt) + L1*(-alpha1+3*beta1*c_conv[q][CA]*c_conv[q][CA]+2*gamma1*sq_sum))*fe_values.JxW(q);
-	    //local_matrix(A,B)+=fe_values.shape_value(A,q)*fe_values.shape_value(B,q)*fe_values.JxW(q);
+	    }
+	    local_matrix(A,B)+= fe_values.shape_value(A,q)*fe_values.shape_value(B,q)*((1.0/dt) + L1*(-alpha1+3*beta1*c_conv[q][ca]*c_conv[q][ca]+2*gamma1*sq_sum))*fe_values.JxW(q);
 	  }
 	}
       }
     }
-    
     // second term
     
     for(unsigned int A=0;A<dofs_per_cell;A++){

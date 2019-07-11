@@ -21,7 +21,7 @@ public:
   Table<1, double>CRSS, CRSS_iteration;
   Table<1, double> Gamma,Gamma_iteration,Gamma_total ;
   Table<1, double>shear_Stress, shear_Stress_iteration;
-  dealii::FullMatrix<double> Fp_previous, Fp_previousIteration;
+  FullMatrix<double> Fp_previous, Fp_previousIteration;
   double vonMissesStress, vonMissesStrain;
 };
 
@@ -44,10 +44,10 @@ void assign_grain_id(FEValues<dim>&fe_values, std::vector<Point<dim> >&grain_see
    //std::cout<<"\n";
    grain_id=grain_ID[grain_id];
    switch(grain_id){
-   case 0: angle=18.0;break;
-   case 1: angle=36.0;break;
-   case 2: angle=54.0;break;
-   case 3: angle=72.0;break;
+   case 0: angle=20.0;break;
+   case 1: angle=35.0;break;
+   case 2: angle=50.0;break;
+   case 3: angle=75.0;break;
    case 4: angle=90.0;break;
    default: angle=0.;break;
    }
@@ -425,6 +425,7 @@ template <class T, int dim>
   unsigned int whilecounter=0;
   Vector<double> gamma_total(n_slip_systems);
   if(size>0){
+
     FullMatrix<double> active_system_matrix, active_system_inv;
     Vector<double> active_system_rhs;
     Vector<double> gamma;
@@ -719,9 +720,9 @@ void residualForMechanics(FEValues<dim>& fe_values, unsigned int DOF, Table<1, d
 	// R = Grad(w)*P
 	for (unsigned int j = 0; j<dim; j++){
 	  for (unsigned int J = 0; J<dim; J++){  
-	    RLocal(A) += -fe_values.shape_grad(A, q)[J]*invF[J][j]*(Piola_stress[i][J])*fe_values.JxW(q);
+	    RLocal(A) += fe_values.shape_grad(A, q)[J]*invF[J][j]*(Piola_stress[i][J])*fe_values.JxW(q);
 	  }
-	  //evaluate tangent
+	  //evaluate tangent modulous
 	  for (unsigned int B=0; B<dofs_per_cell; B++) {   
 	    const unsigned int k = fe_values.get_fe().system_to_component_index(B).first - DOF;
 	    if (k>=0 && k<dim){

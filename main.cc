@@ -29,9 +29,9 @@ namespace elasticity1
       Assert(values.size()==totalDOF, ExcDimensionMismatch(values.size(),totalDOF));
       // initial 3 components of values denote displacement, rest of the components denote phase field parameter
       values(0)=0.;values(1)=0.; values(2)=0.;
-      for(int i=dim;i<dim+n_diff_grains;i++){
-      values(i)=((double)(std::rand()%100))/100;
-       }
+      /*for(int i=0;i<n_diff_grains;i++){
+	values(i)=((double)(std::rand()%100))/100;
+      }*/
       Table<1, double> distance(n_seed_points);
       for(unsigned int i=0;i<n_seed_points;i++){
 	distance[i]=p.distance((*grainPoints)[i]);
@@ -45,8 +45,8 @@ namespace elasticity1
       for(unsigned int i=0;i<n_diff_grains;i++){
 	if(i==g_id) values(dim+i)=(double)(std::rand()%100)/100;
 	else values(dim+i)=0.;
-      }
-      // std::cout<<values(dim)<<" ";
+	}
+      
       
     }
   };
@@ -92,7 +92,7 @@ namespace elasticity1
     //history variables
     std::map<typename DoFHandler<dim>::active_cell_iterator, std::vector< historyVariables<dim>* > > history;
   };
-
+  
   template <int dim>
   elasticity<dim>::elasticity ():
     mpi_communicator (MPI_COMM_WORLD),
@@ -111,7 +111,7 @@ namespace elasticity1
     //nodal Solution names
     for (unsigned int i=0; i<dim; ++i){
       nodal_solution_names.push_back("u"); nodal_data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
-      }
+    }
     // nodal_solution_names.push_back("phase"); nodal_data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
 
 
@@ -202,11 +202,11 @@ namespace elasticity1
      VectorTools::interpolate_boundary_values (dof_handler, 4, ZeroFunction<dim>(totalDOF), constraints2, uBCZ0);
    }
    std::vector<bool> uBCX1 (totalDOF, false); uBCX1[0]=true;
-   if (currentTime<0.1){
-     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0001, totalDOF), constraints, uBCX1);
+   if (currentIncrement<10){
+     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.00, totalDOF), constraints, uBCX1);
    }
    else{
-     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0005, totalDOF), constraints, uBCX1);
+     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.00001, totalDOF), constraints, uBCX1);
    }
    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(totalDOF), constraints2, uBCX1);
     
@@ -353,41 +353,21 @@ namespace elasticity1
 	cell->get_dof_indices (local_dof_indices);
 	 //AD variables
 	Table<1, double> ULocal(dofs_per_cell); Table<1, double > ULocalConv(dofs_per_cell);
-	//Table<1, Sacado::Fad::DFad<double> > ULocal(dofs_per_cell); Table<1, Sacado::Fad::DFad<double> > ULocalConv(dofs_per_cell);
 	for (unsigned int i=0; i<dofs_per_cell; ++i){
 	  ULocal[i]=UGhost(local_dof_indices[i]);
-	  //ULocal[i].diff (i, dofs_per_cell);
 	  ULocalConv[i]= UnGhost(local_dof_indices[i]);
 	}
 	//get defomration map
 	deformationMap<double, dim> defMap(n_q_points); 
 	getDeformationMap<double, dim>(fe_values, 0, ULocal, defMap, currentIteration);
-	Table<1, Sacado::Fad::DFad<double> > R(dofs_per_cell);
-	for(int i=0;i<dofs_per_cell;i++)R[i]=0.0;
 	
 	//pasing a reference of map to residual function in order to store all stress, strain, back_stress, slip_rate at current cell
 	residualForMechanics(fe_values, 0, ULocal, ULocalConv, defMap, currentIteration, currentIncrement, history[cell], local_rhs, local_matrix,  grain_seeds,grain_ID);
 	
-	residualForChemo(fe_values, dim, fe_face_values, cell,  dt, ULocal, ULocalConv,local_rhs, local_matrix);//DOF component 0 if only chemo, dim for coupling
+	residualForChemo(fe_values, dim, fe_face_values, cell,  dt, ULocal, ULocalConv,local_rhs, local_matrix);//DOF component 0 if only chemo, dim for coupling---for mechanics switch residualChemo off
 	
-	for(int i=0;i<dofs_per_cell;i++){
-	  int ci=fe_values.get_fe().system_to_component_index(i).first- dim;
-	  if(i>=0)
-	    local_rhs[i]=-local_rhs[i];
-	}
-	/*for(int i=0;i<dofs_per_cell;i++)local_rhs[i]=-R[i].val();
-	for(unsigned int i=0;i<dofs_per_cell;i++){
-	  for(unsigned int j=0;j<dofs_per_cell;j++){
-	    local_matrix(i,j)=R[i].fastAccessDx(j);
-	  }
-	  }*/
-	/*for(int i=0;i<dofs_per_cell;i++){
-	  for(int j=0;j<dofs_per_cell;j++){
-	    std::cout<<local_matrix(i,j)<<" ";
-	  }std::cout<<"\n";
-	}exit(-1);*/
-
-	//for(unsigned int i=0;i<dofs_per_cell;i++){local_rhs[i]=-local_rhs[i];}
+	for(unsigned int i=0;i<dofs_per_cell;i++){ local_rhs[i]=-local_rhs[i];}//all residual terms negative
+	
 	if ((currentIteration==0)){
 	  constraints.distribute_local_to_global (local_matrix, local_rhs, local_dof_indices, system_matrix, system_rhs);
 	}
@@ -395,7 +375,7 @@ namespace elasticity1
 	  constraints2.distribute_local_to_global (local_matrix, local_rhs, local_dof_indices, system_matrix, system_rhs);
 	}	
       }
-    
+   
     system_matrix.compress (VectorOperation::add);
     system_rhs.compress (VectorOperation::add);
   }
@@ -580,7 +560,11 @@ namespace elasticity1
   template <int dim>
   void elasticity<dim>::run (){
     //setup problem geometry and mesh
+    Point<dim> p1,p2;
+    p1[0]=-50.0; p1[1]=-5.0; p1[2]=5.0;
+    p2[0]=50.0;  p2[1]=5.0;  p2[2]=-5.0;
     GridGenerator::hyper_cube (triangulation, -problemWidth/2.0, problemWidth/2.0, true);
+    // GridGenerator::hyper_rectangle (triangulation, p1,p2, true);
     triangulation.refine_global (refinementFactor);
     grain_generation();
     setup_system ();
