@@ -43,9 +43,14 @@ namespace elasticity1
       }
       unsigned int g_id=(*grainID)[min];
       for(unsigned int i=0;i<n_diff_grains;i++){
-	if(i==g_id) values(dim+i)=(double)(std::rand()%100)/100;
-	else values(dim+i)=0.;
+	if(i==g_id) {
+	  values(dim+i)=(double)(i+1.0)+(double)(1.0-(std::rand()%100)/100.0)*0.07;
+	  // std::cout << i << " ";
 	}
+	else{
+	  values(dim+i)=0.;
+	}
+      }
       
       
     }
@@ -203,7 +208,7 @@ namespace elasticity1
    }
    std::vector<bool> uBCX1 (totalDOF, false); uBCX1[0]=true;
    if (currentIncrement<10){
-     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.00, totalDOF), constraints, uBCX1);
+     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.00001, totalDOF), constraints, uBCX1);
    }
    else{
      VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0005, totalDOF), constraints, uBCX1);
@@ -221,23 +226,31 @@ namespace elasticity1
 
     for(unsigned int i=0;i<n_seed_points;i++){
       grain_seeds.push_back(Point<dim>());
-      std::srand(5.7*i);
-      grain_seeds[i][0]=((double)(std::rand()%10))-5.0;
-      grain_seeds[i][1]=((double)(std::rand()%10))-5.0;
-      grain_seeds[i][2]=((double)(std::rand()%100))-50;
+      //std::srand(5.7*i);
+      grain_seeds[i][0]=((double)(std::rand()%problemWidth))-(problemWidth/2.0);
+      grain_seeds[i][1]=((double)(std::rand()%problemWidth))-(problemWidth/2.0);
+      grain_seeds[i][2]=((double)(std::rand()%problemHeight))-(problemHeight/2.0);
+
     }
+
+    
     //std::srand(5.7);
-    for(unsigned int i=0;i<n_seed_points;i++){
-     
-    }
-    //std::srand(6);
-    for(unsigned int i=0;i<n_seed_points;i++){
+    // 3 grains
+    /*  grain_seeds[0][0]=((double)(std::rand()%problemWidth))-(problemWidth/2.0); grain_seeds[0][1]=((double)(std::rand()%problemWidth))-(problemWidth/2.0); grain_seeds[0][2]=-50+25.0;
+    grain_seeds[1][0]=((double)(std::rand()%problemWidth))-(problemWidth/2.0); grain_seeds[1][1]=((double)(std::rand()%problemWidth))-(problemWidth/2.0); grain_seeds[1][2]=-50.0+50.0;
+    grain_seeds[2][0]=((double)(std::rand()%problemWidth))-(problemWidth/2.0); grain_seeds[2][1]=((double)(std::rand()%problemWidth))-(problemWidth/2.0); grain_seeds[2][2]=-50.0+75.0;*/
 
-    }
-    //std::srand(10.57);
-    for(unsigned int i=0;i<n_seed_points;i++){
+    //4 grains
+    /*    grain_seeds[0][0]=((double)(std::rand()%(problemWidth/2))); grain_seeds[0][1]=((double)(std::rand()%problemWidth))-(problemWidth/2.0); grain_seeds[0][2]=(double)(std::rand()%(problemHeight/2))-(problemHeight/2);
+    grain_seeds[1][0]=((double)(std::rand()%(problemWidth/2)))-(problemWidth/2.0); grain_seeds[1][1]=((double)(std::rand()%problemWidth))-(problemWidth/2.0); grain_seeds[1][2]=(double)(std::rand()%(problemHeight/2))-(problemHeight/2);
+    grain_seeds[2][0]=((double)(std::rand()%(problemWidth/2))); grain_seeds[2][1]=((double)(std::rand()%problemWidth))-(problemWidth/2.0); grain_seeds[2][2]=(double)(std::rand()%(problemHeight/2));
+    grain_seeds[2][0]=((double)(std::rand()%(problemWidth/2)))-(problemWidth/2); grain_seeds[2][1]=((double)(std::rand()%problemWidth))-(problemWidth/2.0); grain_seeds[2][2]=(double)(std::rand()%(problemHeight/2));*/
 
-    }
+    /* grain_seeds[0][0]=2.5;grain_seeds[0][1]=0.0;grain_seeds[0][2]=-25;
+    grain_seeds[1][0]=-2.5;grain_seeds[1][1]=0.0;grain_seeds[1][2]=-25;
+    grain_seeds[2][0]=2.5;grain_seeds[2][1]=0.0;grain_seeds[2][2]=25;
+    grain_seeds[3][0]=-2.5;grain_seeds[3][1]=0.0;grain_seeds[3][2]=25;*/
+
     
     for(unsigned int i=0;i<n_seed_points;i++){
       if(i<n_diff_grains)grain_ID.push_back(i);
@@ -265,10 +278,11 @@ namespace elasticity1
 	//else ends
       }
     }
+
     for(unsigned int i=0;i<n_seed_points;i++){
       std::cout<<grain_seeds[i][0]<<" "<<grain_seeds[i][1]<<" "<<grain_seeds[i][2]<<" "<<grain_ID[i]<<"\n";
     }
-    //exit(-1);
+	//exit(-1);
   }
   
 
@@ -387,7 +401,14 @@ namespace elasticity1
 	residualForChemo(fe_values, dim, fe_face_values, cell,  dt, ULocal, ULocalConv,local_rhs, local_matrix);//DOF component 0 if only chemo, dim for coupling---for mechanics switch residualChemo off
 	
 	for(unsigned int i=0;i<dofs_per_cell;i++){ local_rhs[i]=-local_rhs[i];}//all residual terms negative
-	
+
+	/*for(unsigned int i=0;i<dofs_per_cell;i++){
+	  for(unsigned int j=0;j<dofs_per_cell;j++){
+	    std::cout<<local_matrix(i,j)<<" ";
+	  }std::cout<<"\n";
+	}
+	exit(-1);*/
+	//if(currentIteration==1){for(unsigned int i=0;i<dofs_per_cell;i++) std::cout<<ULocal[i]<<" ";exit(-1);}
 	if ((currentIteration==0)){
 	  constraints.distribute_local_to_global (local_matrix, local_rhs, local_dof_indices, system_matrix, system_rhs);
 	}

@@ -1,7 +1,7 @@
 //problem geometry, mesh control
 #define DIMS 3
-#define problemWidth 10.0
-#define problemHeight 100.0
+#define problemWidth 10
+#define problemHeight 100
 #define NumMeshPoints 5
 #define refinementFactor 0
 
@@ -21,12 +21,12 @@
 #define PI 3.14159265
 #define self_hardening  0.0180
 #define Ss 0.0148
-#define n_seed_points 40
-#define n_diff_grains 10
+#define n_seed_points 20
+#define n_diff_grains 4
 #define totalDOF n_diff_grains+DIMS
 #define InterfaceEnergyParameter {1.0e-3, 1.0e-3, 1.0e-3} //{Kx, Ky, Kz}
 //#define InterfaceEnergyParameter {2, 2, 2} //{Kx, Ky, Kz}
-#define L1 1.0
+#define L1 0.08
 #define alpha1 1
 #define beta1 1
 #define gamma1 1
