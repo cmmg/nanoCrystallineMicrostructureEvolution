@@ -45,7 +45,7 @@ namespace elasticity1
       for(unsigned int i=0;i<n_diff_grains;i++){
 	if(i==g_id) {
 	  values(dim+i)=(double)(i+1.0)+(double)(1.0-(std::rand()%100)/100.0)*0.07;
-	  // std::cout << i << " ";
+	  //std::cout << i << " ";
 	}
 	else{
 	  values(dim+i)=0.;
@@ -131,6 +131,9 @@ namespace elasticity1
     nodal_solution_names_L2.push_back("VonMissesStrain"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
     if (dim==3) {nodal_solution_names_L2.push_back("Gamma3"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);}
     nodal_solution_names_L2.push_back("random"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
+
+    //seed random neumber generator
+    std::srand(std::time(nullptr)); 
   }
   
   template <int dim>
@@ -226,32 +229,11 @@ namespace elasticity1
 
     for(unsigned int i=0;i<n_seed_points;i++){
       grain_seeds.push_back(Point<dim>());
-      //std::srand(5.7*i);
       grain_seeds[i][0]=((double)(std::rand()%problemWidth))-(problemWidth/2.0);
       grain_seeds[i][1]=((double)(std::rand()%problemWidth))-(problemWidth/2.0);
       grain_seeds[i][2]=((double)(std::rand()%problemHeight))-(problemHeight/2.0);
-
     }
-
-    
-    //std::srand(5.7);
-    // 3 grains
-    /*  grain_seeds[0][0]=((double)(std::rand()%problemWidth))-(problemWidth/2.0); grain_seeds[0][1]=((double)(std::rand()%problemWidth))-(problemWidth/2.0); grain_seeds[0][2]=-50+25.0;
-    grain_seeds[1][0]=((double)(std::rand()%problemWidth))-(problemWidth/2.0); grain_seeds[1][1]=((double)(std::rand()%problemWidth))-(problemWidth/2.0); grain_seeds[1][2]=-50.0+50.0;
-    grain_seeds[2][0]=((double)(std::rand()%problemWidth))-(problemWidth/2.0); grain_seeds[2][1]=((double)(std::rand()%problemWidth))-(problemWidth/2.0); grain_seeds[2][2]=-50.0+75.0;*/
-
-    //4 grains
-    /*    grain_seeds[0][0]=((double)(std::rand()%(problemWidth/2))); grain_seeds[0][1]=((double)(std::rand()%problemWidth))-(problemWidth/2.0); grain_seeds[0][2]=(double)(std::rand()%(problemHeight/2))-(problemHeight/2);
-    grain_seeds[1][0]=((double)(std::rand()%(problemWidth/2)))-(problemWidth/2.0); grain_seeds[1][1]=((double)(std::rand()%problemWidth))-(problemWidth/2.0); grain_seeds[1][2]=(double)(std::rand()%(problemHeight/2))-(problemHeight/2);
-    grain_seeds[2][0]=((double)(std::rand()%(problemWidth/2))); grain_seeds[2][1]=((double)(std::rand()%problemWidth))-(problemWidth/2.0); grain_seeds[2][2]=(double)(std::rand()%(problemHeight/2));
-    grain_seeds[2][0]=((double)(std::rand()%(problemWidth/2)))-(problemWidth/2); grain_seeds[2][1]=((double)(std::rand()%problemWidth))-(problemWidth/2.0); grain_seeds[2][2]=(double)(std::rand()%(problemHeight/2));*/
-
-    /* grain_seeds[0][0]=2.5;grain_seeds[0][1]=0.0;grain_seeds[0][2]=-25;
-    grain_seeds[1][0]=-2.5;grain_seeds[1][1]=0.0;grain_seeds[1][2]=-25;
-    grain_seeds[2][0]=2.5;grain_seeds[2][1]=0.0;grain_seeds[2][2]=25;
-    grain_seeds[3][0]=-2.5;grain_seeds[3][1]=0.0;grain_seeds[3][2]=25;*/
-
-    
+    //assign grain_ID to each seed point
     for(unsigned int i=0;i<n_seed_points;i++){
       if(i<n_diff_grains)grain_ID.push_back(i);
       else{
@@ -278,14 +260,9 @@ namespace elasticity1
 	//else ends
       }
     }
-
-    for(unsigned int i=0;i<n_seed_points;i++){
-      std::cout<<grain_seeds[i][0]<<" "<<grain_seeds[i][1]<<" "<<grain_seeds[i][2]<<" "<<grain_ID[i]<<"\n";
-    }
-	//exit(-1);
   }
   
-
+  
   //Setup
   template <int dim>
   void elasticity<dim>::setup_system (){
@@ -388,13 +365,7 @@ namespace elasticity1
 	//get defomration map
 	deformationMap<double, dim> defMap(n_q_points); 
 	getDeformationMap<double, dim>(fe_values, 0, ULocal, defMap, currentIteration);
-	/*std::cout<<dofs_per_cell<<" \n";
-	for(unsigned int i=0;i<dofs_per_cell;i++){
-	  std::cout<<ULocal[i]<<" ";
-	  if((i+1)%13==0)std::cout<<"\n";
 
-	  }*/
-	//exit(-1);
 	//pasing a reference of map to residual function in order to store all stress, strain, back_stress, slip_rate at current cell
 	residualForMechanics(fe_values, 0, ULocal, ULocalConv, defMap, currentIteration, currentIncrement, history[cell], local_rhs, local_matrix,  grain_seeds,grain_ID);
 	
@@ -402,13 +373,6 @@ namespace elasticity1
 	
 	for(unsigned int i=0;i<dofs_per_cell;i++){ local_rhs[i]=-local_rhs[i];}//all residual terms negative
 
-	/*for(unsigned int i=0;i<dofs_per_cell;i++){
-	  for(unsigned int j=0;j<dofs_per_cell;j++){
-	    std::cout<<local_matrix(i,j)<<" ";
-	  }std::cout<<"\n";
-	}
-	exit(-1);*/
-	//if(currentIteration==1){for(unsigned int i=0;i<dofs_per_cell;i++) std::cout<<ULocal[i]<<" ";exit(-1);}
 	if ((currentIteration==0)){
 	  constraints.distribute_local_to_global (local_matrix, local_rhs, local_dof_indices, system_matrix, system_rhs);
 	}
@@ -531,7 +495,7 @@ namespace elasticity1
   //Solve
   template <int dim>
   void elasticity<dim>::solve(){
-    double res=1, tol=1.0e-8, abs_tol=1.0e-14, initial_norm=0, current_norm=0;
+    double res=1, tol=1.0e-6, abs_tol=1.0e-14, initial_norm=0, current_norm=0;
     double machineEPS=1.0e-15;
     currentIteration=0;
     char buffer[200];

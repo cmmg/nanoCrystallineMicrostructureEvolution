@@ -3,7 +3,7 @@
 #define problemWidth 10
 #define problemHeight 100
 #define NumMeshPoints 5
-#define refinementFactor 0
+#define refinementFactor 1
 
 //mechanics properties
 #define elasticModulus 4//2.0e11
@@ -21,12 +21,12 @@
 #define PI 3.14159265
 #define self_hardening  0.0180
 #define Ss 0.0148
-#define n_seed_points 20
-#define n_diff_grains 4
+#define n_seed_points 40
+#define n_diff_grains 8
 #define totalDOF n_diff_grains+DIMS
 #define InterfaceEnergyParameter {1.0e-3, 1.0e-3, 1.0e-3} //{Kx, Ky, Kz}
 //#define InterfaceEnergyParameter {2, 2, 2} //{Kx, Ky, Kz}
-#define L1 0.08
+#define L1 0.3
 #define alpha1 1
 #define beta1 1
 #define gamma1 1
