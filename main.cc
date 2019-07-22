@@ -1,4 +1,4 @@
-
+//kyfsvvykvy
 //
 //Computational Mechanics and Multiphysics Group @ UW-Madison
 //Basic framework for Finite Strain Elasticity
@@ -44,7 +44,7 @@ namespace elasticity1
       unsigned int g_id=(*grainID)[min];
       for(unsigned int i=0;i<n_diff_grains;i++){
 	if(i==g_id) {
-	  values(dim+i)=(double)(i+1.0)+(double)(1.0-(std::rand()%100)/100.0)*0.07;
+	  values(dim+i)=(double)(i+1.0)+(double)(1.0-(std::rand()%100)/100.0)*0.03;
 	  //std::cout << i << " ";
 	}
 	else{
@@ -495,7 +495,7 @@ namespace elasticity1
   //Solve
   template <int dim>
   void elasticity<dim>::solve(){
-    double res=1, tol=1.0e-6, abs_tol=1.0e-14, initial_norm=0, current_norm=0;
+    double res=1, tol=1.0e-8, abs_tol=1.0e-14, initial_norm=0, current_norm=0;
     double machineEPS=1.0e-15;
     currentIteration=0;
     char buffer[200];
