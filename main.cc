@@ -1,4 +1,4 @@
-
+//kyfsvvykvy
 //
 //Computational Mechanics and Multiphysics Group @ UW-Madison
 //Basic framework for Finite Strain Elasticity
@@ -43,10 +43,16 @@ namespace elasticity1
       }
       unsigned int g_id=(*grainID)[min];
       for(unsigned int i=0;i<n_diff_grains;i++){
-	if(i==g_id) values(dim+i)=(double)(std::rand()%100)/100;
-	else values(dim+i)=0.;
+	if(i==g_id) {
+	  values(dim+i)=(double)(i+1.0)+(double)(1.0-(std::rand()%100)/100.0)*0.03;
+	  
 	}
+	else{
+	  values(dim+i)=0.;
+	}
+      }
       
+
       
     }
   };
@@ -92,7 +98,7 @@ namespace elasticity1
     //history variables
     std::map<typename DoFHandler<dim>::active_cell_iterator, std::vector< historyVariables<dim>* > > history;
   };
-
+  
   template <int dim>
   elasticity<dim>::elasticity ():
     mpi_communicator (MPI_COMM_WORLD),
@@ -126,6 +132,9 @@ namespace elasticity1
     nodal_solution_names_L2.push_back("VonMissesStrain"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
     if (dim==3) {nodal_solution_names_L2.push_back("Gamma3"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);}
     nodal_solution_names_L2.push_back("random"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
+
+    //seed random neumber generator
+    std::srand(std::time(nullptr)); 
   }
   
   template <int dim>
@@ -203,10 +212,10 @@ namespace elasticity1
    }
    std::vector<bool> uBCX1 (totalDOF, false); uBCX1[0]=true;
    if (currentIncrement<10){
-     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.00, totalDOF), constraints, uBCX1);
+     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.00001, totalDOF), constraints, uBCX1);
    }
    else{
-     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.00001, totalDOF), constraints, uBCX1);
+     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0005, totalDOF), constraints, uBCX1);
    }
    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(totalDOF), constraints2, uBCX1);
     
@@ -219,15 +228,13 @@ namespace elasticity1
   template<int dim>
   void elasticity<dim>::grain_generation(){
 
-    for(unsigned int I=0;I<n_seed_points;I++){
-      Point<dim> grain_id;
-      std::srand(5.2*I);
-      grain_id[0]=((double)((std::rand())%100)/100)-0.5;
-      grain_id[1]=((double)((std::rand())%100)/100)-0.5;
-      grain_id[2]=((double)((std::rand())%100)/100)-0.5;
-      
-      grain_seeds.push_back(grain_id);
+    for(unsigned int i=0;i<n_seed_points;i++){
+      grain_seeds.push_back(Point<dim>());
+      grain_seeds[i][0]=((double)(std::rand()%problemWidth))-(problemWidth/2.0);
+      grain_seeds[i][1]=((double)(std::rand()%problemWidth))-(problemWidth/2.0);
+      grain_seeds[i][2]=((double)(std::rand()%problemHeight))-(problemHeight/2.0);
     }
+    //assign grain_ID to each seed point
     for(unsigned int i=0;i<n_seed_points;i++){
       if(i<n_diff_grains)grain_ID.push_back(i);
       else{
@@ -254,10 +261,9 @@ namespace elasticity1
 	//else ends
       }
     }
-    
   }
   
-
+  
   //Setup
   template <int dim>
   void elasticity<dim>::setup_system (){
@@ -360,16 +366,14 @@ namespace elasticity1
 	//get defomration map
 	deformationMap<double, dim> defMap(n_q_points); 
 	getDeformationMap<double, dim>(fe_values, 0, ULocal, defMap, currentIteration);
-	
+
 	//pasing a reference of map to residual function in order to store all stress, strain, back_stress, slip_rate at current cell
 	residualForMechanics(fe_values, 0, ULocal, ULocalConv, defMap, currentIteration, currentIncrement, history[cell], local_rhs, local_matrix,  grain_seeds,grain_ID);
 	
 	residualForChemo(fe_values, dim, fe_face_values, cell,  dt, ULocal, ULocalConv,local_rhs, local_matrix);//DOF component 0 if only chemo, dim for coupling---for mechanics switch residualChemo off
 	
-	for(int i=0;i<dofs_per_cell;i++){
-	  local_rhs[i]=-local_rhs[i];
-	}
-	
+	for(unsigned int i=0;i<dofs_per_cell;i++){ local_rhs[i]=-local_rhs[i];}//all residual terms negative
+
 	if ((currentIteration==0)){
 	  constraints.distribute_local_to_global (local_matrix, local_rhs, local_dof_indices, system_matrix, system_rhs);
 	}
@@ -562,7 +566,17 @@ namespace elasticity1
   template <int dim>
   void elasticity<dim>::run (){
     //setup problem geometry and mesh
-    GridGenerator::hyper_cube (triangulation, -problemWidth/2.0, problemWidth/2.0, true);
+    Point<dim> p1,p2;
+    p1[0]=-problemWidth/2.0; p1[1]=-problemWidth/2.0; p1[2]=-problemHeight/2.0;
+    p2[0]=problemWidth/2.0; p2[1]=problemWidth/2.0; p2[2]=problemHeight/2.0;
+    // GridGenerator::hyper_cube (triangulation, -problemWidth/2.0, problemWidth/2.0, true);
+    // GridGenerator::hyper_rectangle (triangulation, p1,p2, true);
+    std::vector<unsigned int> repetitions;
+    repetitions.push_back(NumMeshPoints);
+    repetitions.push_back(NumMeshPoints);
+    repetitions.push_back(NumMeshPoints*std::floor(problemHeight/problemWidth));
+    GridGenerator::subdivided_hyper_rectangle (triangulation, repetitions,p1,p2,true);
+      
     triangulation.refine_global (refinementFactor);
     grain_generation();
     setup_system ();
