@@ -69,6 +69,8 @@ namespace elasticity1
     void applyBoundaryConditions(const unsigned int increment);
     void setup_system ();
     void assemble_system ();
+    void solveKrylov(LA::MPI::Vector& completely_distributed_solution);
+    void solveDirect(LA::MPI::Vector& completely_distributed_solution);
     void solveIteration (bool isProject=false);
     void grain_generation();
     void solve ();
@@ -440,12 +442,19 @@ namespace elasticity1
     
   }
 
-  //Solve
+ 
+  //Direct Solver
   template <int dim>
-  void elasticity<dim>::solveIteration(bool isProject){
-    TimerOutput::Scope t(computing_timer, "solve");
-    LA::MPI::Vector completely_distributed_solution (locally_owned_dofs, mpi_communicator);
-    /*    
+  void elasticity<dim>::solveDirect(LA::MPI::Vector& completely_distributed_solution){
+    //MUMPS Direct solver
+    SolverControl cn;
+    PETScWrappers::SparseDirectMUMPS solver(cn, mpi_communicator);
+    solver.solve(system_matrix, completely_distributed_solution, system_rhs);
+  }
+
+  //Iterative Solvers
+  template <int dim>
+  void elasticity<dim>::solveKrylov(LA::MPI::Vector& completely_distributed_solution){
     //Iterative solvers from Petsc and Trilinos
     SolverControl solver_control (dof_handler.n_dofs(), 1e-12);
 #ifdef USE_PETSC_LA
@@ -456,7 +465,7 @@ namespace elasticity1
     LA::MPI::PreconditionAMG preconditioner;
     LA::MPI::PreconditionAMG::AdditionalData data;
 #ifdef USE_PETSC_LA
-    //data.symmetric_operator = true;
+    data.symmetric_operator = true;
 #else
     // Trilinos defaults are good 
 #endif
@@ -464,14 +473,19 @@ namespace elasticity1
     solver.solve (system_matrix, completely_distributed_solution, system_rhs, preconditioner);
     pcout << "   Solved in " << solver_control.last_step()
           << " iterations." << std::endl;
-    */
-    //Direct solver MUMPS
-    SolverControl cn;
-    PETScWrappers::SparseDirectMUMPS solver(cn, mpi_communicator);
+  }
+  
+  //Solve
+  template <int dim>
+  void elasticity<dim>::solveIteration(bool isProject){
+    TimerOutput::Scope t(computing_timer, "solve");
+    LA::MPI::Vector completely_distributed_solution (locally_owned_dofs, mpi_communicator);
     if(!isProject){
-      //solver.set_symmetric_mode(false);
-      //system_matrix.print(std::cout);
-      solver.solve(system_matrix, completely_distributed_solution, system_rhs);
+#if isDirectSolver
+      solveDirect(completely_distributed_solution);
+#else
+      solveKrylov(completely_distributed_solution);
+#endif
       //
       if ((currentIteration==0)){
 	constraints.distribute (completely_distributed_solution);
@@ -484,8 +498,12 @@ namespace elasticity1
     }
     else
       {
-	//solver.set_symmetric_mode(true);
-	solver.solve(mass_matrix, completely_distributed_solution, system_rhs);
+#if isDirectSolver
+	solveDirect(completely_distributed_solution);
+#else
+	solveKrylov(completely_distributed_solution);
+#endif
+	//
 	constraints_L2.distribute (completely_distributed_solution);
 	locally_relevant_solution_L2 = completely_distributed_solution;
 	U_L2 = completely_distributed_solution;
