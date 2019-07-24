@@ -24,8 +24,8 @@
 #define PI 3.14159265
 #define self_hardening  0.0180
 #define Ss 0.0148
-#define n_seed_points 100
-#define n_diff_grains 10
+#define n_seed_points 40
+#define n_diff_grains 4
 #define totalDOF n_diff_grains+DIMS
 #define InterfaceEnergyParameter {1.0e-3, 1.0e-3, 1.0e-3} //{Kx, Ky, Kz}
 //#define InterfaceEnergyParameter {2, 2, 2} //{Kx, Ky, Kz}

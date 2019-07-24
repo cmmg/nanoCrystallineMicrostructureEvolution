@@ -44,7 +44,8 @@ namespace elasticity1
       unsigned int g_id=(*grainID)[min];
       for(unsigned int i=0;i<n_diff_grains;i++){
 	if(i==g_id) {
-	  values(dim+i)=(double)(i+1.0)+(double)(1.0-(std::rand()%100)/100.0)*0.03;
+	  //values(dim+i)=(double)(i+1.0)+(double)(1.0-(std::rand()%100)/100.0)*0.03;
+	  values(dim+i)=(double)(3*i)+(double)(1.0-(std::rand()%100)/100)*0.02;
 	  
 	}
 	else{

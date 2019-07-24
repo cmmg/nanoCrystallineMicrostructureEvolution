@@ -47,11 +47,11 @@ void residualForChemo(FEValues<dim>& fe_values, unsigned int dof, FEFaceValues<d
   for(unsigned int i=0; i<dofs_per_cell; i++){
     int ck=fe_values.get_fe().system_to_component_index(i).first - dof;
     if(ck>=0){
-      g_id1=ck+1;//2.0*ck+1;
+      g_id1=3.0*ck-1;//ck+1;//2.0*ck+1;
       for(unsigned int q=0;q<n_q_points;q++){
 	double sq_sum=0.0;
 	for(long int p=0;p<n_diff_grains;p++){
-	  double g_id2=p+1;
+	  double g_id2=3.0*p-1;
 	  if(p==ck)continue;
 	  else sq_sum+=(c_conv[q][p]-g_id2+1)*(c_conv[q][p]-g_id2+1);//penalty term (c-(g_id-1)) note:- 'p' is (g_id-1) as g_id are varying from 1 to n
 	  } 
@@ -76,13 +76,13 @@ void residualForChemo(FEValues<dim>& fe_values, unsigned int dof, FEFaceValues<d
     for(unsigned int A=0;A<dofs_per_cell;A++){
       int ca=fe_values.get_fe().system_to_component_index(A).first-dof;
       if(ca>=0){
-	g_id1=ca+1.0;//2.0*ca+1.0;
+	g_id1=3.0*ca-1.0;//ca+1.0;//2.0*ca+1.0;
 	for(unsigned int B=0;B<dofs_per_cell;B++){
 	  int cb=fe_values.get_fe().system_to_component_index(B).first-dof;
 	  if(cb==ca){	  
 	    double sq_sum=0.;
 	    for(unsigned int p=0;p<n_diff_grains;p++){
-	      double g_id2=p+1;//2.0*p+1.0;
+	      double g_id2=3.0*p-1.0;//2.0*p+1.0;
 	      if(p==cb)continue;
 	      else sq_sum+=std::pow((c_conv[q][p]-g_id2+1.0),2);
 	    }
