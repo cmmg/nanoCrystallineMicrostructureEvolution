@@ -1,275 +1,119 @@
-//kyfsvvykvy
-//
+
+ //
 //Computational Mechanics and Multiphysics Group @ UW-Madison
-//Basic framework for Finite Strain Elasticity
+//Basic framework for Phase Field (Cahn-Hilliard mixed formulation)
 //Created May 2018
 //authors: rudraa (2018)
 //
-//main
+
 //deal.II headers
 #include "include/headers.h"
 //input parameter headers
 #include "parameters.h"
 //physics headers
-#include "include/mechanics.h"
 #include "include/chemo.h"
 
 //Namespace
-namespace elasticity1
+namespace phaseField1
 {
   using namespace dealii;
 
-  template<int dim>
-  class InitialCondition: public Function<dim>{
+  //Initial conditions
+  template <int dim>
+  class InitalConditions: public Function<dim> {
   public:
-    std::vector<Point<dim> >* grainPoints;
-    std::vector<unsigned int> * grainID;
-    InitialCondition(std::vector<Point<dim> >*_grainPoints, std::vector<unsigned int>*_grainId):Function<dim>(totalDOF), grainPoints(_grainPoints),grainID(_grainId){}
-    void vector_value(const Point<dim> &p, Vector<double>&values)const{
-      Assert(values.size()==totalDOF, ExcDimensionMismatch(values.size(),totalDOF));
-      // initial 3 components of values denote displacement, rest of the components denote phase field parameter
-      values(0)=0.;values(1)=0.; values(2)=0.;
-      /*for(int i=0;i<n_diff_grains;i++){
-	values(i)=((double)(std::rand()%100))/100;
+    InitalConditions (): Function<dim>(TotalDOF){std::srand(5);}
+    /*
+    double value (const Point<dim>   &p) const {
+      return (0.63 + 0.02*(0.5 -(double)(std::rand() % 100 )/100.0)); //c
       }*/
-      Table<1, double> distance(n_seed_points);
-      for(unsigned int i=0;i<n_seed_points;i++){
-	distance[i]=p.distance((*grainPoints)[i]);
-      }
-      
-      int min=0;
-      for(unsigned int i=0;i<n_seed_points;i++){
-	if(distance[i]<distance[min])min=i;
-      }
-      unsigned int g_id=(*grainID)[min];
-      for(unsigned int i=0;i<n_diff_grains;i++){
-	if(i==g_id) {
-	  //values(dim+i)=(double)(i+1.0)+(double)(1.0-(std::rand()%100)/100.0)*0.03;
-	  values(dim+i)=(double)(3*i)+(double)(1.0-(std::rand()%100)/100)*0.02;
-	  
-	}
-	else{
-	  values(dim+i)=0.;
-	}
-      }
-      
-
-      
+    void vector_value (const Point<dim>   &p, Vector<double>   &values) const {
+      Assert (values.size() == TotalDOF, ExcDimensionMismatch (values.size(),TotalDOF));
+     
+      values(0)=0.00;
+      if (std::sqrt(p.square())<0.3) {values(0)=0.99;}
+      // values(1)=((double)(std::rand()%100))/100.;
+      values(1)=0.01 + ((double)(std::rand()%25)/100.)*0.02;
     }
   };
   
-  
   template <int dim>
-  class elasticity{
+  class phaseField{
   public:
-    elasticity ();
-    ~elasticity ();
+    phaseField ();
+    ~phaseField ();
     void run ();
 
   private:
     void applyBoundaryConditions(const unsigned int increment);
     void setup_system ();
     void assemble_system ();
-    void solveKrylov(LA::MPI::Vector& completely_distributed_solution);
-    void solveDirect(LA::MPI::Vector& completely_distributed_solution);
-    void solveIteration (bool isProject=false);
-    void grain_generation();
+    void solveIteration ();
     void solve ();
     void refine_grid ();
-    void output_results (const unsigned int increment, bool isProject=false);
-    void l2_projection();
+    void output_results (const unsigned int increment);
     MPI_Comm                                  mpi_communicator;
     parallel::distributed::Triangulation<dim> triangulation;
     FESystem<dim>                             fe;
     DoFHandler<dim>                           dof_handler;
     IndexSet                                  locally_owned_dofs;
     IndexSet                                  locally_relevant_dofs;
-    ConstraintMatrix                          constraints, constraints2,constraints_L2;
-    LA::MPI::SparseMatrix                     system_matrix,mass_matrix;
+    ConstraintMatrix                          constraints;
+    LA::MPI::SparseMatrix                     system_matrix;
     LA::MPI::Vector                           locally_relevant_solution, U, Un, UGhost, UnGhost, dU;
-    LA::MPI::Vector                           locally_relevant_solution_L2, U_L2, UGhost_L2;
     LA::MPI::Vector                           system_rhs;
     ConditionalOStream                        pcout;
     TimerOutput                               computing_timer;
-    std::vector<Point<dim> >                  grain_seeds;
-    std::vector<unsigned int>                 grain_ID;
+    //fstream                                  myfile;
     //solution variables
     unsigned int currentIncrement, currentIteration;
     double totalTime, currentTime, dt;
+    Sacado::Fad::DFad<double> free_energy;
     std::vector<std::string> nodal_solution_names; std::vector<DataComponentInterpretation::DataComponentInterpretation> nodal_data_component_interpretation;
- std::vector<std::string> nodal_solution_names_L2; std::vector<DataComponentInterpretation::DataComponentInterpretation> nodal_data_component_interpretation_L2;
-    //history variables
-    std::map<typename DoFHandler<dim>::active_cell_iterator, std::vector< historyVariables<dim>* > > history;
   };
-  
+
   template <int dim>
-  elasticity<dim>::elasticity ():
+  phaseField<dim>::phaseField ():
     mpi_communicator (MPI_COMM_WORLD),
     triangulation (mpi_communicator,
                    typename Triangulation<dim>::MeshSmoothing
                    (Triangulation<dim>::smoothing_on_refinement |
                     Triangulation<dim>::smoothing_on_coarsening)),
-    fe(FE_Q<dim>(1), totalDOF),// change the degree of freedoms per node from displacement to displacement+grain_parameter
+    fe(FE_Q<dim>(1),TotalDOF),
     dof_handler (triangulation),
     pcout (std::cout, (Utilities::MPI::this_mpi_process(mpi_communicator)== 0)),
     computing_timer (mpi_communicator, pcout, TimerOutput::summary, TimerOutput::wall_times){
     //solution variables
     dt=TimeStep; totalTime=TotalTime;
     currentIncrement=0; currentTime=0;
-    
+    free_energy=0.;
     //nodal Solution names
-    for (unsigned int i=0; i<dim; ++i){
-      nodal_solution_names.push_back("u"); nodal_data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
-    }
-    // nodal_solution_names.push_back("phase"); nodal_data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
-
-
-    char buffer[100];
-    for(char i=0;i<n_diff_grains;i++){
-      sprintf(buffer, "eta%u",i);
-      nodal_solution_names.push_back(buffer);nodal_data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
-    }
-    
-    
-    nodal_solution_names_L2.push_back("Grain_Id"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
-    nodal_solution_names_L2.push_back("VonMissesStrain"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
-    if (dim==3) {nodal_solution_names_L2.push_back("Gamma3"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);}
-    nodal_solution_names_L2.push_back("random"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
-
-    //seed random neumber generator
-    std::srand(std::time(nullptr)); 
+    nodal_solution_names.push_back("c"); nodal_data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
+    nodal_solution_names.push_back("solute"); nodal_data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
+    // nodal_solution_names.push_back("mu"); nodal_data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
   }
   
   template <int dim>
-  elasticity<dim>::~elasticity (){
+  phaseField<dim>::~phaseField () {
     dof_handler.clear ();
   }
-  
+
   //Apply boundary conditions
   template <int dim>
-  void elasticity<dim>::applyBoundaryConditions(const unsigned int increment){
-    constraints.clear (); constraints2.clear (); constraints_L2.clear ();
+  void phaseField<dim>::applyBoundaryConditions(const unsigned int increment){
+    constraints.clear (); 
     constraints.reinit (locally_relevant_dofs);
-    constraints2.reinit (locally_relevant_dofs);
-    constraints_L2.reinit (locally_relevant_dofs);
     DoFTools::make_hanging_node_constraints (dof_handler, constraints);
-    DoFTools::make_hanging_node_constraints (dof_handler, constraints2);
-    DoFTools::make_hanging_node_constraints (dof_handler, constraints_L2);
     
     //Setup boundary conditions
-    /*
-    std::vector<bool> uBCX0 (dim, true); 
-    VectorTools::interpolate_boundary_values (dof_handler, 0, ZeroFunction<dim>(dim), constraints, uBCX0);
-    VectorTools::interpolate_boundary_values (dof_handler, 0, ZeroFunction<dim>(dim), constraints2, uBCX0);
-    std::vector<bool> uBCX1 (dim, false); uBCX1[0]=true; 
-    VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.001, dim), constraints, uBCX1);
-    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints2, uBCX1);
-    */
+    //No Dirchlet BC are necessary for the parabolic problem
     
-    
-    //for shear uncomment this
-    
-    /* std::vector<bool> uBCX0 (dim, true); uBCX0[0]=true;
-    VectorTools::interpolate_boundary_values (dof_handler, 0, ZeroFunction<dim>(dim), constraints, uBCX0);
-    VectorTools::interpolate_boundary_values (dof_handler, 0, ZeroFunction<dim>(dim), constraints2, uBCX0);
-    std::vector<bool> uBCX1 (dim, true); uBCX1[2]=false;
-    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints, uBCX1);
-    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints2, uBCX1);
-    std::vector<bool> uBCX1Z (dim, false); uBCX1Z[2]=true;
-    VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0001, dim), constraints, uBCX1Z);
-    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints2, uBCX1Z);*/
-
-
-
-     
-    
-    // for simple shear uncomment this
-    /*
-    std::vector<bool> uBCX1Z (dim, false); uBCX1Z[2]=true;
-    VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0001, dim), constraints, uBCX1Z);
-    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints2, uBCX1Z);*/
-     
-
-
-
-
-    // for pure shear uncomment this    
-    /* std::vector<bool> uBCX1Y (dim, true); uBCX1Y[2]=false;
-    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints, uBCX1Y);
-    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(dim), constraints2, uBCX1Y);*/
-
-    
-   //simple tension boundary condition
-      
-   std::vector<bool> uBCX0 (totalDOF, false); uBCX0[0]=true;
-   VectorTools::interpolate_boundary_values (dof_handler, 0, ZeroFunction<dim>(totalDOF), constraints, uBCX0);
-   VectorTools::interpolate_boundary_values (dof_handler, 0, ZeroFunction<dim>(totalDOF), constraints2, uBCX0);
-   
-   std::vector<bool> uBCY0 (totalDOF, false); uBCY0[1]=true;
-   VectorTools::interpolate_boundary_values (dof_handler, 2, ZeroFunction<dim>(totalDOF), constraints, uBCY0);
-   VectorTools::interpolate_boundary_values (dof_handler, 2, ZeroFunction<dim>(totalDOF), constraints2, uBCY0);
-   if (dim==3) {
-     std::vector<bool> uBCZ0 (totalDOF, false); uBCZ0[2]=true;
-     VectorTools::interpolate_boundary_values (dof_handler, 4, ZeroFunction<dim>(totalDOF), constraints, uBCZ0);
-     VectorTools::interpolate_boundary_values (dof_handler, 4, ZeroFunction<dim>(totalDOF), constraints2, uBCZ0);
-   }
-   std::vector<bool> uBCX1 (totalDOF, false); uBCX1[0]=true;
-   if (currentIncrement<10){
-     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.00001, totalDOF), constraints, uBCX1);
-   }
-   else{
-     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0005, totalDOF), constraints, uBCX1);
-   }
-   VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(totalDOF), constraints2, uBCX1);
-    
-   constraints.close ();
-   constraints2.close ();    
-   constraints_L2.close ();
-
-   }
-  //grain id generation
-  template<int dim>
-  void elasticity<dim>::grain_generation(){
-
-    for(unsigned int i=0;i<n_seed_points;i++){
-      grain_seeds.push_back(Point<dim>());
-      grain_seeds[i][0]=((double)(std::rand()%problemWidth))-(problemWidth/2.0);
-      grain_seeds[i][1]=((double)(std::rand()%problemWidth))-(problemWidth/2.0);
-      grain_seeds[i][2]=((double)(std::rand()%problemHeight))-(problemHeight/2.0);
-    }
-    //assign grain_ID to each seed point
-    for(unsigned int i=0;i<n_seed_points;i++){
-      if(i<n_diff_grains)grain_ID.push_back(i);
-      else{
-	Table<1, double> distance(i),temp_d(i);unsigned int var,findid_j, findid_k;
-	for(unsigned int j=0;j<i;j++){
-	  distance[j]=grain_seeds[i].distance(grain_seeds[j]);
-	  temp_d[j]=distance[j];
-	}
-	for(unsigned int j=0;j<i;j++){
-	  for(unsigned int k=0;k<i;k++){
-	    if(temp_d[k]>temp_d[j]){double t=temp_d[k];temp_d[k]=temp_d[j];temp_d[j]=t;}
-	  }
-	}
-	for(unsigned int j=0;j<i;j++){ 
-	  var=0;
-	  for(unsigned int l=0;l<i;l++){if(temp_d[i-1-j]==distance[l])findid_j=grain_ID[l]; }
-	  for(unsigned int k=0;k<n_diff_grains-1;k++){
-	    for(unsigned int l=0;l<i;l++)if(temp_d[k]==distance[l])findid_k=grain_ID[l]; 
-	    if(findid_j==findid_k){var=1;break;}
-	  }
-	  if(var==1)continue;
-	  else{grain_ID.push_back(findid_j);break;}
-	}
-	//else ends
-      }
-    }
+    constraints.close ();
   }
-  
   
   //Setup
   template <int dim>
-  void elasticity<dim>::setup_system (){
+  void phaseField<dim>::setup_system (){
     TimerOutput::Scope t(computing_timer, "setup");
     dof_handler.distribute_dofs (fe);
     locally_owned_dofs = dof_handler.locally_owned_dofs ();
@@ -290,67 +134,27 @@ namespace elasticity1
     applyBoundaryConditions(0);
     
     DynamicSparsityPattern dsp (locally_relevant_dofs);
-    DoFTools::make_sparsity_pattern (dof_handler, dsp, constraints2, false);
+    DoFTools::make_sparsity_pattern (dof_handler, dsp, constraints, false);
     SparsityTools::distribute_sparsity_pattern (dsp, dof_handler.n_locally_owned_dofs_per_processor(), mpi_communicator, locally_relevant_dofs);
     system_matrix.reinit (locally_owned_dofs, locally_owned_dofs, dsp, mpi_communicator);
-
-    //create data structure for L2 projection
-     DynamicSparsityPattern dsp_L2 (locally_relevant_dofs);
-    DoFTools::make_sparsity_pattern (dof_handler, dsp_L2, constraints_L2, false);
-    SparsityTools::distribute_sparsity_pattern (dsp_L2, dof_handler.n_locally_owned_dofs_per_processor(), mpi_communicator, locally_relevant_dofs);
-    mass_matrix.reinit (locally_owned_dofs, locally_owned_dofs, dsp_L2, mpi_communicator);
-    locally_relevant_solution_L2.reinit (locally_owned_dofs, locally_relevant_dofs, mpi_communicator);
-    U_L2.reinit (locally_owned_dofs, mpi_communicator);
-    UGhost_L2.reinit (locally_owned_dofs, locally_relevant_dofs, mpi_communicator);
-    
-    //setup history variables
-    const QGauss<dim>  quadrature_formula(3);
-    FEValues<dim> fe_values (fe, quadrature_formula, update_values);
-    typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(), endc = dof_handler.end();
-    for (; cell!=endc; ++cell){
-      if (cell->is_locally_owned()){
-	for (unsigned int q=0; q<fe_values.n_quadrature_points; q++){
-	  history[cell].push_back(new historyVariables<dim>); //create histroy variables object at each quad point of the cell.
-	  //history[cell].back()->Grain_Id=0;
-	  //history[cell].back()->orientationAngle=0;
-	  for(unsigned int i=0;i<n_slip_systems;i++){
-	    history[cell].back()->CRSS[i]=0.0016;
-	    history[cell].back()->CRSS_iteration[i]=0.0016;
-	    history[cell].back()->Gamma_iteration[i]=0.;
-	    history[cell].back()->Gamma[i]=0.;
-	    history[cell].back()->shear_Stress_iteration[i]=0.;
-	    history[cell].back()->shear_Stress[i]=0.;
-	    history[cell].back()->Gamma_total[i]=0.;
-	  }
-	  for(unsigned int i=0;i<dim;i++)
-	    {   
-	      for(unsigned int j=0;j<dim;j++)
-		{	 
-		  history[cell].back()->Fp_previous(i,j)=(i==j);
-		  history[cell].back()->Fp_previousIteration(i,j)=(i==j);
-		  
-		}
-	    }
-	}
-      }
-    }
   }
-  
+
   //Assembly
   template <int dim>
-  void elasticity<dim>::assemble_system (){
+  void phaseField<dim>::assemble_system (){
     TimerOutput::Scope t(computing_timer, "assembly");
     system_rhs=0.0; system_matrix=0.0;
     const QGauss<dim>  quadrature_formula(3);
-    const QGauss<dim-1>	face_quadrature_formula (3);
+    const QGauss<dim-1>	face_quadrature_formula (2);
     FEValues<dim> fe_values (fe, quadrature_formula,
                              update_values    |  update_gradients |
                              update_quadrature_points |
                              update_JxW_values);
     FEFaceValues<dim> fe_face_values (fe, face_quadrature_formula, update_values | update_quadrature_points | update_JxW_values | update_normal_vectors);
     const unsigned int   dofs_per_cell = fe.dofs_per_cell;
+    // std::cout<<"dof per cell"<<dofs_per_cell;
     FullMatrix<double>   local_matrix (dofs_per_cell, dofs_per_cell);
-    Vector<double>       local_rhs (dofs_per_cell); 
+    Vector<double>       local_rhs (dofs_per_cell);
     std::vector<unsigned int> local_dof_indices (dofs_per_cell);
     unsigned int n_q_points= fe_values.n_quadrature_points;
   
@@ -361,101 +165,66 @@ namespace elasticity1
 	local_matrix = 0; local_rhs = 0; 
 	cell->get_dof_indices (local_dof_indices);
 	 //AD variables
-	Table<1, double> ULocal(dofs_per_cell); Table<1, double > ULocalConv(dofs_per_cell);
+	
+	Table<1, Sacado::Fad::DFad<double> > ULocal(dofs_per_cell); Table<1, double > ULocalConv(dofs_per_cell);
 	for (unsigned int i=0; i<dofs_per_cell; ++i){
-	  ULocal[i]=UGhost(local_dof_indices[i]);
+	  if (std::abs(UGhost(local_dof_indices[i]))<1.0e-16){ULocal[i]=0.0;}
+	  else{ULocal[i]=UGhost(local_dof_indices[i]);}
+	  ULocal[i].diff (i, dofs_per_cell);
 	  ULocalConv[i]= UnGhost(local_dof_indices[i]);
 	}
-	//get defomration map
-	deformationMap<double, dim> defMap(n_q_points); 
-	getDeformationMap<double, dim>(fe_values, 0, ULocal, defMap, currentIteration);
-
-	//pasing a reference of map to residual function in order to store all stress, strain, back_stress, slip_rate at current cell
-	residualForMechanics(fe_values, 0, ULocal, ULocalConv, defMap, currentIteration, currentIncrement, history[cell], local_rhs, local_matrix,  grain_seeds,grain_ID);
+	//
+	//	std::cout<<dofs_per_cell<<"     " ;
+	//for(unsigned int i=0;i<dofs_per_cell;i++)std::cout<<ULocal[i]<<" ";exit(-1);
+	dealii::Table<1,double> c_conv(n_q_points);
+	//setup residual vector
+	free_energy=0.;
+	Table<1, Sacado::Fad::DFad<double> > R(dofs_per_cell); 
+	for (unsigned int i=0; i<dofs_per_cell; ++i) {R[i]=0.0;}
 	
-	residualForChemo(fe_values, dim, fe_face_values, cell,  dt, ULocal, ULocalConv,local_rhs, local_matrix);//DOF component 0 if only chemo, dim for coupling---for mechanics switch residualChemo off
+	//populate residual vector 
+	residualForChemo(fe_values, 0, fe_face_values, cell, dt, ULocal, ULocalConv, R,/* currentTime, totalTime,*/ c_conv,local_matrix,currentIncrement,free_energy);
 	
-	for(unsigned int i=0;i<dofs_per_cell;i++){ local_rhs[i]=-local_rhs[i];}//all residual terms negative
+	//evaluate Residual(R) and Jacobian(R')
 
-	if ((currentIteration==0)){
-	  constraints.distribute_local_to_global (local_matrix, local_rhs, local_dof_indices, system_matrix, system_rhs);
+	for(unsigned int i=0;i<dofs_per_cell;i++){
+	  local_rhs(i)=-R[i].val();
 	}
-	else{
-	  constraints2.distribute_local_to_global (local_matrix, local_rhs, local_dof_indices, system_matrix, system_rhs);
-	}	
+	for(unsigned int i=0;i<dofs_per_cell;i++){
+	  for(unsigned int j=0;j<dofs_per_cell;j++){
+	    local_matrix(i,j)=R[i].fastAccessDx(j);
+	  }
+	}
+	/*for (unsigned int i=0; i<dofs_per_cell; ++i) {
+	  for (unsigned int j=0; j<dofs_per_cell; ++j){
+	    // R' by AD
+	    local_matrix(i,j)= R[i].fastAccessDx(j);
+	  }
+	  //R
+	  local_rhs(i) = -R[i].val();
+	  }*/
+	/*for(int i=0;i<dofs_per_cell;i++){
+	  for(int j=0;j<dofs_per_cell;j++){
+	    std::cout<<local_matrix(i,j)<<" ";
+	  }std::cout<<"\n";
+	}
+	std::cout<<"\n\n\n";
+	for(unsigned int i=0;i<dofs_per_cell;i++)std::cout<<R[i]<<" ";
+	exit(-1);*/
+
+	constraints.distribute_local_to_global (local_matrix, local_rhs, local_dof_indices, system_matrix, system_rhs);
       }
-   
     system_matrix.compress (VectorOperation::add);
     system_rhs.compress (VectorOperation::add);
   }
-
-   template <int dim>
-   void elasticity<dim>::l2_projection (){
-     TimerOutput::Scope t(computing_timer, "projection");
-     system_rhs=0.0; mass_matrix=0.0;
-     const QGauss<dim>  quadrature_formula(3);
-     FEValues<dim> fe_values (fe, quadrature_formula,
-			      update_values   |
-			      update_quadrature_points |
-			      update_JxW_values);
-     const unsigned int   dofs_per_cell = fe.dofs_per_cell;
-    FullMatrix<double>   local_matrix (dofs_per_cell, dofs_per_cell);
-    Vector<double>       local_rhs (dofs_per_cell); 
-    std::vector<unsigned int> local_dof_indices (dofs_per_cell);
-    unsigned int n_q_points= fe_values.n_quadrature_points;
   
-    typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(), endc = dof_handler.end();
-    for (; cell!=endc; ++cell)
-      if (cell->is_locally_owned()){
-	fe_values.reinit (cell);
-	local_matrix = 0.0; local_rhs = 0.0; 
-	cell->get_dof_indices (local_dof_indices);
-	
-	//implement L2 projection
-	for (unsigned int q=0; q<n_q_points; q++){
-	  for(unsigned int i=0;i<dofs_per_cell;i++){
-	    const unsigned int ci = fe_values.get_fe().system_to_component_index(i).first;
-	    if (ci==0){
-	      local_rhs(i)+=fe_values.shape_value(i,q)*(history[cell][q]->Grain_Id)*fe_values.JxW(q);
-	    }
-	    else if (ci==1){
-	      local_rhs(i)+= fe_values.shape_value(i,q)*history[cell][q]->vonMissesStrain*fe_values.JxW(q);
-	    }
-	    for(unsigned int j=0;j<dofs_per_cell;j++){
-	      const unsigned int cj = fe_values.get_fe().system_to_component_index(j).first;
-	      if (ci==cj){
-		local_matrix(i,j)+= fe_values.shape_value(i,q)*fe_values.shape_value(j,q)*fe_values.JxW(q);
-	      }
-	    }
-	  }
-	}
-	
-	//assemble
-	constraints_L2.distribute_local_to_global (local_matrix, local_rhs, local_dof_indices, mass_matrix, system_rhs);
-      }
-    mass_matrix.compress (VectorOperation::add);
-    system_rhs.compress (VectorOperation::add);
 
-    //solve
-    //solveIteration(true);
-   
-    //
-    
-  }
-
- 
-  //Direct Solver
+  //Solve
   template <int dim>
-  void elasticity<dim>::solveDirect(LA::MPI::Vector& completely_distributed_solution){
-    //MUMPS Direct solver
-    SolverControl cn;
-    PETScWrappers::SparseDirectMUMPS solver(cn, mpi_communicator);
-    solver.solve(system_matrix, completely_distributed_solution, system_rhs);
-  }
-
-  //Iterative Solvers
-  template <int dim>
-  void elasticity<dim>::solveKrylov(LA::MPI::Vector& completely_distributed_solution){
+  void phaseField<dim>::solveIteration(){
+    TimerOutput::Scope t(computing_timer, "solve");
+    LA::MPI::Vector completely_distributed_solution (locally_owned_dofs, mpi_communicator);
+    /*    
     //Iterative solvers from Petsc and Trilinos
     SolverControl solver_control (dof_handler.n_dofs(), 1e-12);
 #ifdef USE_PETSC_LA
@@ -463,10 +232,10 @@ namespace elasticity1
 #else
     LA::SolverGMRES solver(solver_control);
 #endif
-    LA::MPI::PreconditionJacobi preconditioner;
+    LA::MPI::PreconditionAMG preconditioner;
     LA::MPI::PreconditionAMG::AdditionalData data;
 #ifdef USE_PETSC_LA
-    data.symmetric_operator = true;
+    //data.symmetric_operator = true;
 #else
     // Trilinos defaults are good 
 #endif
@@ -474,84 +243,53 @@ namespace elasticity1
     solver.solve (system_matrix, completely_distributed_solution, system_rhs, preconditioner);
     pcout << "   Solved in " << solver_control.last_step()
           << " iterations." << std::endl;
-  }
-  
-  //Solve
-  template <int dim>
-  void elasticity<dim>::solveIteration(bool isProject){
-    TimerOutput::Scope t(computing_timer, "solve");
-    LA::MPI::Vector completely_distributed_solution (locally_owned_dofs, mpi_communicator);
-    if(!isProject){
-#if isDirectSolver
-      solveDirect(completely_distributed_solution);
-#else
-      solveKrylov(completely_distributed_solution);
-#endif
-      //
-      if ((currentIteration==0)){
-	constraints.distribute (completely_distributed_solution);
-      }
-      else{
-	constraints2.distribute (completely_distributed_solution);
-      }
-      locally_relevant_solution = completely_distributed_solution;
-      dU = completely_distributed_solution;
-    }
-    else
-      {
-#if isDirectSolver
-	solveDirect(completely_distributed_solution);
-#else
-	solveKrylov(completely_distributed_solution);
-#endif
-	//
-	constraints_L2.distribute (completely_distributed_solution);
-	locally_relevant_solution_L2 = completely_distributed_solution;
-	U_L2 = completely_distributed_solution;
-	UGhost_L2 = U_L2;
-      }
+    */
+    //Direct solver MUMPS
+    SolverControl cn;
+    PETScWrappers::SparseDirectMUMPS solver(cn, mpi_communicator);
+    solver.set_symmetric_mode(false);
+    solver.solve(system_matrix, completely_distributed_solution, system_rhs);
+    constraints.distribute (completely_distributed_solution);
+    locally_relevant_solution = completely_distributed_solution;
+    dU = completely_distributed_solution; 
   }
 
   //Solve
   template <int dim>
-  void elasticity<dim>::solve(){
-    double res=1, tol=1.0e-8, abs_tol=1.0e-14, initial_norm=0, current_norm=0;
+  void phaseField<dim>::solve(){
+    double res=1, tol=1.0e-9, abs_tol=1.0e-12, initial_norm=0, current_norm=0;
     double machineEPS=1.0e-15;
     currentIteration=0;
     char buffer[200];
     while (true){
-      if (currentIteration>=200){sprintf(buffer, "maximum number of iterations reached without convergence. \n"); pcout<<buffer; break; exit (1);}
+      if (currentIteration>=50){sprintf(buffer, "maximum number of iterations reached without convergence. \n"); pcout<<buffer; break; exit (1);}
       if (current_norm>1/std::pow(tol,2)){sprintf(buffer, "\n norm is too high. \n\n"); pcout<<buffer; break; exit (1);}
       assemble_system();
       current_norm=system_rhs.l2_norm();
       initial_norm=std::max(initial_norm, current_norm);
       res=current_norm/initial_norm;
       sprintf(buffer,"inc:%3u (time:%10.3e, dt:%10.3e), iter:%2u, abs-norm: %10.2e, rel-norm: %10.2e\n", currentIncrement, currentTime, dt,  currentIteration, current_norm, res); pcout<<buffer; 
-      if ((currentIteration>1) && ((res<tol) || (current_norm<abs_tol))){sprintf(buffer,"residual converged in %u iterations.\n\n", currentIteration); pcout<<buffer; break;}
+      if ((currentIteration>1) && ((res<tol) || (current_norm<abs_tol))){sprintf(buffer,"residual converged in %u iterations.\n\n", currentIteration); pcout<<buffer; pcout<<"\n"; /*pcout<<currentIncrement<<"\t "<<free_energy.val();/*myfile<<free_energy<<" ";*/ break;}
       solveIteration();
       U+=dU; UGhost=U; 
       ++currentIteration;
-      //break;
     }
     Un=U; UnGhost=Un;
   }
 
   //Output
   template <int dim>
-  void elasticity<dim>::output_results (const unsigned int cycle, bool isProject) {
+  void phaseField<dim>::output_results (const unsigned int cycle) {
     TimerOutput::Scope t(computing_timer, "output");
     DataOut<dim> data_out;
     data_out.attach_dof_handler (dof_handler);
-   
-    data_out.add_data_vector (UnGhost, nodal_solution_names, DataOut<dim>::type_dof_data, nodal_data_component_interpretation);
-    //data_out.add_data_vector (UGhost_L2, nodal_solution_names_L2, DataOut<dim>::type_dof_data, nodal_data_component_interpretation_L2);
+    data_out.add_data_vector (UnGhost, nodal_solution_names, DataOut<dim>::type_dof_data, nodal_data_component_interpretation);    
 
     Vector<float> subdomain (triangulation.n_active_cells());
     for (unsigned int i=0; i<subdomain.size(); ++i)
       subdomain(i) = triangulation.locally_owned_subdomain();
-   
     data_out.add_data_vector (subdomain, "subdomain");
-
+    
     data_out.build_patches ();
     const std::string filename = ("solution-" +
                                   Utilities::int_to_string (cycle, 2) +
@@ -560,7 +298,6 @@ namespace elasticity1
                                   (triangulation.locally_owned_subdomain(), 4));
     std::ofstream output ((filename + ".vtu").c_str());
     data_out.write_vtu (output);
-   
     if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0){
       std::vector<std::string> filenames;
       for (unsigned int i=0;
@@ -576,28 +313,15 @@ namespace elasticity1
 				    Utilities::int_to_string (cycle, 2) +
 				    ".pvtu").c_str());
       data_out.write_pvtu_record (master_output, filenames);
-      
     }
-    
   }
 
   //Solve problem
   template <int dim>
-  void elasticity<dim>::run (){
+  void phaseField<dim>::run (){
     //setup problem geometry and mesh
-    Point<dim> p1,p2;
-    p1[0]=-problemWidth/2.0; p1[1]=-problemWidth/2.0; p1[2]=-problemHeight/2.0;
-    p2[0]=problemWidth/2.0; p2[1]=problemWidth/2.0; p2[2]=problemHeight/2.0;
-    // GridGenerator::hyper_cube (triangulation, -problemWidth/2.0, problemWidth/2.0, true);
-    // GridGenerator::hyper_rectangle (triangulation, p1,p2, true);
-    std::vector<unsigned int> repetitions;
-    repetitions.push_back(NumMeshPoints);
-    repetitions.push_back(NumMeshPoints);
-    repetitions.push_back(NumMeshPoints*std::floor(problemHeight/problemWidth));
-    GridGenerator::subdivided_hyper_rectangle (triangulation, repetitions,p1,p2,true);
-      
+    GridGenerator::hyper_cube (triangulation, -problemWidth/2.0, problemWidth/2.0, true);
     triangulation.refine_global (refinementFactor);
-    grain_generation();
     setup_system ();
     pcout << "   Number of active cells:       "
 	  << triangulation.n_global_active_cells()
@@ -605,28 +329,23 @@ namespace elasticity1
 	  << "   Number of degrees of freedom: "
 	  << dof_handler.n_dofs()
 	  << std::endl;
-   
-    //setup initial conditions
     
-    VectorTools::interpolate(dof_handler, InitialCondition<dim>(&grain_seeds, &grain_ID), U); Un=U;
-    //U=0.0;
-    // 
+    //setup initial conditions
+    VectorTools::interpolate(dof_handler, InitalConditions<dim>(), U); Un=U;
+    
     //sync ghost vectors to non-ghost vectors
     UGhost=U;  UnGhost=Un;
     output_results (0);
-    
+    //myfile.open("freeEnergy.txt",ios::out);
     //Time stepping
     currentIncrement=0;
     for (currentTime=0; currentTime<totalTime; currentTime+=dt){
       currentIncrement++;
-     
-      applyBoundaryConditions(currentIncrement);
-
       solve();
-      //l2_projection();
       output_results(currentIncrement);
       pcout << std::endl;
     }
+   
     //computing_timer.print_summary ();
   }
 }
@@ -636,9 +355,10 @@ int main(int argc, char *argv[]){
   try
     {
       using namespace dealii;
-      using namespace elasticity1;
+      using namespace phaseField1;
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
-      elasticity<DIMS> problem;
+      phaseField<2> problem;
+      //fstream myfile;
       problem.run ();
     }
   catch (std::exception &exc)
