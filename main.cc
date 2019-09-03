@@ -463,7 +463,7 @@ namespace elasticity1
 #else
     LA::SolverGMRES solver(solver_control);
 #endif
-    LA::MPI::PreconditionAMG preconditioner;
+    LA::MPI::PreconditionJacobi preconditioner;
     LA::MPI::PreconditionAMG::AdditionalData data;
 #ifdef USE_PETSC_LA
     data.symmetric_operator = true;
