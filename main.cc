@@ -29,11 +29,15 @@ namespace phaseField1
       }*/
     void vector_value (const Point<dim>   &p, Vector<double>   &values) const {
       Assert (values.size() == TotalDOF, ExcDimensionMismatch (values.size(),TotalDOF));
-     
-      values(0)=0.00;
+       values(0)=0.01;
+      
       if (std::sqrt(p.square())<0.3) {values(0)=0.99;}
       // values(1)=((double)(std::rand()%100))/100.;
-      values(1)=0.01 + ((double)(std::rand()%25)/100.)*0.02;
+      values(1)=0.3 + 0.02*(0.5 -(double)(std::rand() % 100 )/100.0);
+    //else values(1)=0.0;
+      //values(1)=0.2 + 0.02*(0.5 -(double)(std::rand() % 100 )/100.0);//0.1 + ((double)(std::rand()%100)/100.)*0.02;
+      values(2)=0.;//0.5+((double)(std::rand()%100))/100;
+
     }
   };
   
