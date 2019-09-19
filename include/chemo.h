@@ -9,131 +9,128 @@
 #include "functionEvaluations.h"
 #include "supplementaryFunctions.h"
 
-
-template<int  dim>
+template<int dim>
 struct historyVariables{
-public:
-  historyVariables<dim>():grainID(0.0){}
-  Sacado::Fad::DFad<double> grainID;
-  
+  historyVariables<dim>(){}
+  Sacado::Fad::DFad<double> ID;
 };
 
-
 template<int dim>
-void evaluatePhiValue(unsigned int q, Table<1, Sacado::Fad::DFad<double> >&c, Table<1, Sacado::Fad::DFad<double> >&c_conv,Table<2,Sacado::Fad::DFad<double> >&c_j ,FEValues<dim>& fe_values, unsigned int DOF, FEFaceValues<dim>& fe_face_values, const typename DoFHandler<dim>::active_cell_iterator &cell, double dt, dealii::Table<1, Sacado::Fad::DFad<double> >& ULocal, dealii::Table<1, Sacado::Fad::DFad<double> >& ULocalConv,std::vector<historyVariables<dim>* >&history, unsigned int currentIteration){
+void evaluateFieldAtQuadraturePoint(unsigned int q, Table<1, Sacado::Fad::DFad<double> >&phi, Table<1, Sacado::Fad::DFad<double> >&phi_conv, Table<2, Sacado::Fad::DFad<double> >&phi_j, Sacado::Fad::DFad<double>&sol, Sacado::Fad::DFad<double>&sol_conv, Table<1, Sacado::Fad::DFad<double> >&sol_j,Sacado::Fad::DFad<double>&mu ,Table<1, Sacado::Fad::DFad<double> >&mu_j,FEValues<dim>& fe_values, unsigned int DOF, FEFaceValues<dim>& fe_face_values, const typename DoFHandler<dim>::active_cell_iterator &cell, double dt, dealii::Table<1,Sacado::Fad::DFad<double> >& ULocal, dealii::Table<1, double>& ULocalConv, dealii::Table<1,Sacado::Fad::DFad<double> >& R,FullMatrix<double>&local_matrix,unsigned int currentIncrement,unsigned int currentIteration ,Sacado::Fad::DFad<double>& free_energy,std::vector<historyVariables<dim>* >& history) {
 
   unsigned int dofs_per_cell=fe_values.dofs_per_cell;
-
   for(unsigned int i=0;i<dofs_per_cell;i++){
-    unsigned int ck=fe_values.get_fe().system_to_component_index(i).first;
-    if(ck<n_diff_grains){
-      c[ck]+=fe_values.shape_value(i,q)*ULocal[i];
-      c_conv[ck]+=fe_values.shape_value(i,q)*ULocalConv[i];
-
+    
+    unsigned int ci=fe_values.get_fe().system_to_component_index(i).first;
+    if(ci<n_diff_grains){
+      phi[ci]+=fe_values.shape_value(i,q)*ULocal[i];
+      phi_conv[ci]+=fe_values.shape_value(i,q)*ULocalConv[i];
       for(unsigned int j=0;j<dim;j++){
-	c_j[ck][j]+=fe_values.shape_grad(i,q)[j]*ULocal[i];
+	phi_j[ci][j]+=fe_values.shape_grad(i,q)[j]*ULocal[i];
       }
     }
+    if(ci==n_diff_grains){
+      sol+=fe_values.shape_value(i,q)*ULocal[i];
+      sol_conv+=fe_values.shape_value(i,q)*ULocalConv[i];
+      for(unsigned int j=0;j<dim;j++){
+	sol_j[j]+=fe_values.shape_grad(i,q)[j]*ULocal[i];
+      }
+    }
+    if(ci==n_diff_grains+1){
+      mu+=fe_values.shape_value(i,q)*ULocal[i];
+      for(unsigned int j=0;j<dim;j++){
+	mu_j[j]+=fe_values.shape_grad(i,q)[j]*ULocal[i];
+      }
+    }
+
+    //dof loop ends
   }
 
-    if(currentIteration==0){
-    unsigned int ctr=0, id=0;
-   
+  if(currentIteration==0){
     for(unsigned int i=0;i<n_diff_grains;i++){
-      if(c[i]<0.9)ctr++;
-      else {id=i+1;break;}
+      if(phi_conv[i]>0.93){history[q]->ID=i+1;break;}
+      else{history[q]->ID=0;}
     }
-    if(ctr==n_diff_grains)history[q]->grainID=-10.0;
-    else if(ctr<n_diff_grains)history[q]->grainID=10*id;
-    //if ends
-    }
+  }
   
-  // function definition ends 
+  //function definition ends
 }
 
-
 template<int dim>
-void residualForChemo(FEValues<dim>& fe_values, unsigned int DOF, FEFaceValues<dim>& fe_face_values, const typename DoFHandler<dim>::active_cell_iterator &cell, double dt, dealii::Table<1, Sacado::Fad::DFad<double> >& ULocal, dealii::Table<1, Sacado::Fad::DFad<double> >& ULocalConv, dealii::Table<1, Sacado::Fad::DFad<double> >& R, FullMatrix<double >&local_matrix,std::vector<historyVariables<dim>* >&history, unsigned int currentIteration){
+void residualForChemo(FEValues<dim>& fe_values, unsigned int DOF, FEFaceValues<dim>& fe_face_values, const typename DoFHandler<dim>::active_cell_iterator &cell, double dt, dealii::Table<1,Sacado::Fad::DFad<double> >& ULocal, dealii::Table<1, double>& ULocalConv, dealii::Table<1,Sacado::Fad::DFad<double> >& R, /*double currentTime, double totalTime,*/ dealii::Table<2,Sacado::Fad::DFad<double> >& phi_conv,FullMatrix<double>&local_matrix,unsigned int currentIncrement, Sacado::Fad::DFad<double>& free_energy, unsigned int currentIteration ,std::vector<historyVariables<dim>* >& history){
+
   unsigned int dofs_per_cell=fe_values.dofs_per_cell;
   unsigned int n_q_points=fe_values.n_quadrature_points;
-  double Kappa[]=InterfaceEnergyParameter;
+
   for(unsigned int q=0;q<n_q_points;q++){
-    Table<1, Sacado::Fad::DFad<double> >c(n_diff_grains), c_conv(n_diff_grains);// phase variable at each quadrature point
-    Table<2, Sacado::Fad::DFad<double> >c_j(n_diff_grains, dim);
-    for(int i=0;i<n_diff_grains;i++){c[i]=0.; c_conv[i]=0.;}
-    for(int i=0;i<n_diff_grains;i++)for(int j=0;j<dim;j++)c_j[i][j]=0.;
-    evaluatePhiValue<dim>( q, c, c_conv, c_j ,fe_values, DOF, fe_face_values,cell,dt, ULocal, ULocalConv,history, currentIteration);//calculate phi values and gradient at this quadrature point
-
+    Table<1, Sacado::Fad::DFad<double> >phi(n_diff_grains), phi_conv(n_diff_grains), sol_j(dim), mu_j(dim);
+    Table<2,Sacado::Fad::DFad<double> >phi_j(n_diff_grains, dim);
+    for(unsigned int i=0;i<n_diff_grains;i++){phi[i]=0.; phi_conv[i]=0.;}
+    for(unsigned int i=0;i<dim;i++){sol_j[i]=0.; mu_j[i]=0.;}
     for(unsigned int i=0;i<dofs_per_cell;i++){
-      unsigned int ck=fe_values.get_fe().system_to_component_index(i).first;
-      Sacado::Fad::DFad<double> sq_sum=0.;
-      for(int I=0;I<n_diff_grains;I++){if(ck==I)continue; else sq_sum+=c[I]*c[I];}
-      R[i]+=(1.0/dt)*fe_values.shape_value(i,q)*(c[ck]-c_conv[ck])*fe_values.JxW(q);
-      R[i]-=L*fe_values.shape_value(i,q)*(c[ck]-pow(c[ck],3)-2.0*alpha1*c[ck]*sq_sum)*fe_values.JxW(q);
-
       for(unsigned int j=0;j<dim;j++){
-	Sacado::Fad::DFad<double> Kjj=Kappa[j];
-	Sacado::Fad::DFad<double> kc_j=c_j[ck][j]*Kjj;
-	R[i]+=L*fe_values.shape_grad(i,q)[j]*kc_j*fe_values.JxW(q);
+	phi_j[i][j]+=0.;
       }
     }
+    Sacado::Fad::DFad<double> mu=0.0, sol=0.0, sol_conv=0.0;
+    evaluateFieldAtQuadraturePoint<dim>( q, phi, phi_conv, phi_j, sol, sol_conv, sol_j, mu , mu_j, fe_values,  DOF,fe_face_values,cell, dt,ULocal,  ULocalConv,  R,local_matrix,  currentIncrement,currentIteration, free_energy, history) ;
+    Sacado::Fad::DFad<double> epsilon=InterfaceEnergyParameter;
+    Sacado::Fad::DFad<double> M=0., M_phi=Mobility;
+    for(unsigned int i=0;i<dofs_per_cell;i++){
+      unsigned int ci=fe_values.get_fe().system_to_component_index(i).first;
+      
+      if(ci<n_diff_grains){
+	Sacado::Fad::DFad<double> phi2_sum=0.;
+	Sacado::Fad::DFad<double> W_sol=0.;
+	W_sol=WA*(1.0-sol)+WB*sol;
+	for(unsigned int I=0;I<n_diff_grains;I++){
+	  phi2_sum+=pow(phi[I],2);
+	}
+        
+	R[i]+=(1/dt)*fe_values.shape_value(i,q)*(phi[ci]-phi_conv[ci])*fe_values.JxW(q);
+	R[i]+=fe_values.shape_value(i,q)*(4./3.)*(M_phi/Vm)*(-12.0*phi[ci]*phi[ci]+12.0*phi[ci]*phi2_sum)*W_sol*fe_values.JxW(q);
+	for(unsigned int j=0;j<dim;j++){
+	  R[i]+=(M_phi)*epsilon*fe_values.shape_grad(i,q)[j]*phi_j[ci][j]*fe_values.JxW(q);
+	}
+	
+      }
+      if(ci==n_diff_grains){
+	M=0.;
+	M=M_alpha;//pow(M_gb/M_alpha,4*c[q]*(1-c[q]));
+	
+	R[i]+=(1/dt)*fe_values.shape_value(i,q)*(sol-sol_conv)*fe_values.JxW(q);
+	for(unsigned int j=0;j<dim;j++){
+	  R[i]+=M*fe_values.shape_grad(i,q)[j]*mu_j[j]*fe_values.JxW(q);
+	}
+	
+      }
+      if(ci==n_diff_grains+1){
+	Sacado::Fad::DFad<double> g_phi=0.;
+	Sacado::Fad::DFad<double> phi2_sum=0.;
+	Sacado::Fad::DFad<double> phi3_sum=0.;
+	for(unsigned int I=0;I<n_diff_grains;I++){
+	  phi2_sum+=pow(phi[I],2);
+	  phi3_sum+=pow(phi[I],3);
+	}
+	g_phi=(4./3.)*(1.0- 4.0* phi3_sum + 3.0* phi2_sum*phi2_sum); // g_phi calculated
+	Sacado::Fad::DFad<double> dG_dSol=0.;
+	dG_dSol=800*sol*(sol-1.0)*(sol-0.5)+g_phi*(WB-WA);
+	R[i]+=fe_values.shape_value(i,q)*(mu-dG_dSol)*fe_values.JxW(q);
+	for(unsigned int j=0;j<dim;j++){
+	  R[i]-=kappa*fe_values.shape_grad(i,q)[j]*sol_j[j]*fe_values.JxW(q);
+	}
+	
+	
+      }
+    }
+    
+    
     
   }
   
 }
 
 
-//Chemistry residual implementation
-/*template <int dim>
-void residualForChemo(FEValues<dim>& fe_values, unsigned int DOF, FEFaceValues<dim>& fe_face_values, const typename DoFHandler<dim>::active_cell_iterator &cell, double dt, dealii::Table<1, Sacado::Fad::DFad<double> >& ULocal, dealii::Table<1, Sacado::Fad::DFad<double> >& ULocalConv, dealii::Table<1, Sacado::Fad::DFad<double> >& R, dealii::Table<2, Sacado::Fad::DFad<double> >& c_conv, FullMatrix<double >&local_matrix){
-  unsigned int dofs_per_cell= fe_values.dofs_per_cell;
-  unsigned int n_q_points= fe_values.n_quadrature_points;
-  Table<2, Sacado::Fad::DFad<double> >LocalMatrix(dofs_per_cell, dofs_per_cell);
-  //evaluate gradients 
-  
-  dealii::Table<2, Sacado::Fad::DFad<double> > c(n_q_points,n_diff_grains);         
-  dealii::Table<3, Sacado::Fad::DFad<double> > c_j(n_q_points,n_diff_grains, dim);
-  for (unsigned int q=0;q<n_q_points;q++) {
-    for(unsigned int p=0;p<n_diff_grains;p++){
-      c[q][p]=0.0;c_conv[q][p]=0.0;
-      for(unsigned int j=0;j<dim;j++){
-	c_j[q][p][j]=0.0;
-      }
-    }
-    for(unsigned int i=0;i<dofs_per_cell;i++){ 
-      unsigned int ck=fe_values.get_fe().system_to_component_index(i).first- DOF;
-      c[q][ck]+=fe_values.shape_value(i,q)*ULocal[i];
-      c_conv[q][ck]+=fe_values.shape_value(i,q)*ULocalConv[i];
-      for(unsigned int j=0;j<dim;j++){
-	c_j[q][ck][j]+=fe_values.shape_grad(i,q)[j]*ULocal[i];
-      }
-    }
-    
-  }
-  double Kappa[]=InterfaceEnergyParameter;
-  
-  for(unsigned int i=0; i<dofs_per_cell; i++){
-    unsigned int ck=fe_values.get_fe().system_to_component_index(i).first - DOF;
-    for(unsigned int q=0;q<n_q_points;q++){
-      Sacado::Fad::DFad<double> sq_sum=0.0;
-      for(int p=0;p<n_diff_grains;p++){ if(p==ck)continue; else sq_sum+=(c_conv[q][p])*(c_conv[q][p]); }
-      R[i]+=(1.0/dt)*fe_values.shape_value(i,q)*(c[q][ck]-c_conv[q][ck])*fe_values.JxW(q);
-      R[i]-=L*fe_values.shape_value(i,q)*(c[q][ck]-pow(c[q][ck],3)-2.0*alpha1*c[q][ck]*sq_sum )*fe_values.JxW(q);
-      
-      for(unsigned int j=0;j<dim;j++){
-	Sacado::Fad::DFad<double> Kjj= Kappa[j];
-	Sacado::Fad::DFad<double> kc_j= c_j[q][ck][j]*Kjj; // Kjj*C_j
-	R[i]+=L*fe_values.shape_grad(i,q)[j]*kc_j*fe_values.JxW(q);
-      }
-      
-    }
-  }
-  
-
-
-
-  
-}*/
 
 
 #endif /* CHEMO_H_ */
