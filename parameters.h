@@ -24,8 +24,8 @@
 #define temperature 900
 #define GA 0
 #define GB 0
-#define n_seed_points 2
-#define n_diff_grains 2
+#define N_seed_points 500
+#define n_diff_grains 9
 #define ch_potential 1
 #define W_phi 50
 #define zeta1 2

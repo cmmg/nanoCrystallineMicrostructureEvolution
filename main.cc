@@ -23,7 +23,8 @@ namespace phaseField1
   public:
     std::vector<Point<dim> > *grainPoints;
     std::vector<unsigned int> *grainID;
-    InitalConditions (std::vector<Point<dim> >*_grainPoints, std::vector<unsigned int>*_grainID): Function<dim>(TotalDOF),grainPoints(_grainPoints),grainID(_grainID){}
+    unsigned int n_seed_points;
+    InitalConditions (std::vector<Point<dim> >*_grainPoints, std::vector<unsigned int>*_grainID, unsigned int _n_seed_point): Function<dim>(TotalDOF),grainPoints(_grainPoints),grainID(_grainID),n_seed_points(_n_seed_point){}
    
     void vector_value (const Point<dim>   &p, Vector<double>   &values) const {
       Assert (values.size() == TotalDOF, ExcDimensionMismatch (values.size(),TotalDOF));
@@ -89,6 +90,7 @@ namespace phaseField1
     TimerOutput                               computing_timer;
     std::vector<Point<dim> >                  grain_seeds;
     std::vector<unsigned int>                 grain_ID;
+    unsigned int                              n_seed_points;
     //solution variables
     unsigned int currentIncrement, currentIteration;
     double totalTime, currentTime, dt;
@@ -153,13 +155,48 @@ namespace phaseField1
   
   template<int dim>
   void phaseField<dim>::grain_generation(){
-    std::srand(5);
-    for(unsigned int i=0;i<n_seed_points;i++){
-      grain_seeds.push_back(Point<dim>());
-      grain_seeds[i][0]=((double)(std::rand()%100))/100.-(problemWidth/2.0);
-      grain_seeds[i][1]=((double)(std::rand()%100))/100.-(problemWidth/2.0);
-      // grain_seeds[i][2]=((double)(std::rand()%problemHeight))-(problemHeight/2.0);
+    n_seed_points=N_seed_points;
+    double radii=problemWidth/(std::sqrt(n_seed_points));
+    pcout<<"radii"<<radii<<"\n";
+    Point<dim> grain;
+    std::srand(0.78);
+    //srand (time(NULL));
+    grain[0]=((double)((std::rand())%100)/100)-0.5;
+    grain[1]=((double)((std::rand())%100)/100)-0.5;
+    
+    grain_seeds.push_back(grain);
+    
+    for(unsigned int I=1;I<n_seed_points;I++){
+      Point<dim>grain;
+      unsigned int ctr=1, cntr=0, cond=1;
+      while(ctr>0){
+	cntr++;ctr=0;
+	if(cntr==200000){cond=0; break;}
+	Table<1, double>distance(I);
+	for(unsigned int k=0;k<I;k++)distance[k]=0.;
+	grain[0]=((double)(std::rand()%100)/100)-0.5;
+	grain[1]=((double)(std::rand()%100)/100)-0.5;
+	for(unsigned int k=0;k<I;k++){
+	  distance[k]=grain.distance(grain_seeds[k]);
+	  if(distance[k]<radii)ctr++;
+	}
+	//while ends here
+      }
+      if(cond==0){n_seed_points=I;break;}
+      grain_seeds.push_back(grain);
+      //for loop ends for generating points
     }
+    
+    double min=0.;
+    min=grain_seeds[0].distance(grain_seeds[1]);
+
+    for(unsigned int i=0;i<n_seed_points;i++){
+      for(unsigned int j=i+1;j<n_seed_points;j++){
+	if(grain_seeds[i].distance(grain_seeds[j])<min)min=grain_seeds[i].distance(grain_seeds[j]);
+      }
+    }
+
+    std::cout<<"number of seed points"<<n_seed_points<<"minimum distance="<<min;
     //assign grain_ID to each seed point
     for(unsigned int i=0;i<n_seed_points;i++){
       if(i<n_diff_grains)grain_ID.push_back(i);
@@ -493,7 +530,7 @@ const QGauss<dim>  quadrature_formula(3);
 	  << std::endl;
     
     //setup initial conditions
-    VectorTools::interpolate(dof_handler, InitalConditions<dim>(&grain_seeds, &grain_ID), U); Un=U;
+    VectorTools::interpolate(dof_handler, InitalConditions<dim>(&grain_seeds, &grain_ID, n_seed_points), U); Un=U;
     
     //sync ghost vectors to non-ghost vectors
     UGhost=U;  UnGhost=Un;
