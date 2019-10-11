@@ -142,7 +142,7 @@ namespace phaseField1
     //srand (time(NULL));
     grain[0]=((double)((std::rand())%100)/100)-0.5;
     grain[1]=((double)((std::rand())%100)/100)-0.5;
-    
+    grain[2]=((double)((std::rand())%100)/100)-0.5;
     grain_seeds.push_back(grain);
     
     for(unsigned int I=1;I<n_seed_points;I++){
@@ -155,6 +155,7 @@ namespace phaseField1
 	for(unsigned int k=0;k<I;k++)distance[k]=0.;
 	grain[0]=((double)(std::rand()%100)/100)-0.5;
 	grain[1]=((double)(std::rand()%100)/100)-0.5;
+	grain[2]=((double)((std::rand())%100)/100)-0.5;
 	for(unsigned int k=0;k<I;k++){
 	  distance[k]=grain.distance(grain_seeds[k]);
 	  if(distance[k]<radii)ctr++;

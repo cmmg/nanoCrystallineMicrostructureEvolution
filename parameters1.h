@@ -1,6 +1,6 @@
 
 //problem geometry, mesh control
-#define DIMS 2
+#define DIMS 3
 #define problemWidth 1.0
 #define refinementFactor 8
 
