@@ -40,11 +40,11 @@ void evaluatePhiValue(unsigned int q, Table<1, Sacado::Fad::DFad<double> >&c, Ta
     unsigned int ctr=0, id=0;
     
     for(unsigned int i=0;i<n_diff_grains;i++){
-      if(c_conv[i].val()>0.9){id=i+1;break;}
+      if(std::abs(c_conv[i].val()-1.0)<0.1){id=i+1;break;}
       else {ctr++;}
     }
     
-    if(ctr==n_diff_grains){history[q]->grainID=n_diff_grains+10;}
+    if(ctr==n_diff_grains){history[q]->grainID=n_diff_grains+5;}
     else {history[q]->grainID=id;}
     //if ends
   }

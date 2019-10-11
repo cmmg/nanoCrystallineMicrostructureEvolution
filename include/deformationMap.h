@@ -48,10 +48,10 @@ void getDeformationMap(FEValues<dim>& fe_values, unsigned int DOF, Table<1, T>& 
       }
     }
     //detF
-    if (defMap.detF[q]<=1.0e-15 && iteration==0){
-      printf("**************Non Positive Jacobian Detected**************. Value: %12.4e\n", defMap.detF[q]);
+    if (defMap.detF[q].val()<=1.0e-15 && iteration==0){
+      printf("**************Non positive jacobian detected**************. Value: %12.4e\n", defMap.detF[q].val());
       for (unsigned int i=0; i<dim; ++i){
-	for (unsigned int j=0; j<dim; ++j) printf("%12.6e  ", defMap.F[q][i][j]);
+	for (unsigned int j=0; j<dim; ++j) printf("%12.6e  ", defMap.F[q][i][j].val());
 	printf("\n"); exit(-1);
       }
       //throw "Non positive jacobian detected";
