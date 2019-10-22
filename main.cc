@@ -215,10 +215,10 @@ namespace elasticity1
    }
    std::vector<bool> uBCX1 (totalDOF, false); uBCX1[0]=true;
    if (currentIncrement<10){
-     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0001, totalDOF), constraints, uBCX1);
+     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.001, totalDOF), constraints, uBCX1);
    }
    else{
-     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0005, totalDOF), constraints, uBCX1);
+     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.005, totalDOF), constraints, uBCX1);
    }
    VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(totalDOF), constraints2, uBCX1);
     
@@ -235,9 +235,9 @@ namespace elasticity1
     std::srand(0.45);
     n_seed_points=N_seed_points;
     for(unsigned int i=0;i<n_seed_points;i++){
-      grain[0]=(std::rand()%10)-5;
+      grain[0]=(std::rand()%100)-50;
       grain[1]=(std::rand()%10)-5;
-      grain[2]=(std::rand()%100)-50;
+      grain[2]=(std::rand()%10)-5;
       grain_seeds.push_back(grain);
     }
     for(unsigned int i=0;i<n_diff_grains;i++){
@@ -592,7 +592,7 @@ template <int dim>
   //Solve
   template <int dim>
   void elasticity<dim>::solve(){
-    double res=1, tol=1.0e-8, abs_tol=1.0e-10, initial_norm=0, current_norm=0;
+    double res=1, tol=1.0e-7, abs_tol=1.0e-9, initial_norm=0, current_norm=0;
     double machineEPS=1.0e-15;
     currentIteration=0;
     char buffer[200];
@@ -663,8 +663,8 @@ template <int dim>
   void elasticity<dim>::run (){
     //setup problem geometry and mesh
     Point<dim> p1,p2;
-    p1[0]=-problemWidth/2.0; p1[1]=-problemWidth/2.0; p1[2]=-problemHeight/2.0;
-    p2[0]=problemWidth/2.0; p2[1]=problemWidth/2.0; p2[2]=problemHeight/2.0;
+    p1[0]=-problemHeight/2.0; p1[1]=-problemWidth/2.0; p1[2]=-problemWidth/2.0;
+    p2[0]=problemHeight/2.0; p2[1]=problemWidth/2.0; p2[2]=problemWidth/2.0;
     // GridGenerator::hyper_cube (triangulation, -problemWidth/2.0, problemWidth/2.0, true);
     // GridGenerator::hyper_rectangle (triangulation, p1,p2, true);
     std::vector<unsigned int> repetitions;
@@ -672,6 +672,7 @@ template <int dim>
     repetitions.push_back(NumMeshPoints);
     repetitions.push_back(NumMeshPoints*std::floor(problemHeight/problemWidth));
     GridGenerator::subdivided_hyper_rectangle (triangulation, repetitions,p1,p2,true);
+    //GridGenerator::hyper_cube (triangulation, -0.5, 0.5, true);
       
     triangulation.refine_global (refinementFactor);
     grain_generation();

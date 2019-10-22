@@ -184,10 +184,10 @@ template<class T,int dim>
 
   for(unsigned int i=0;i<dim;i++){
     for(unsigned int j=0;j<dim;j++){
-      E[i][j]=E_prime[i][j]-(0.00001)*QuadRotation[i][j];
+      E[i][j]=E_prime[i][j]-(lambda1)*QuadRotation[i][j];
     }
   }
-
+  
   /*for(int i=0;i<dim;i++){
     for(int j=0;j<dim;j++){
       std::cout<<E[i][j]<<" ";
@@ -393,15 +393,15 @@ template <class T, int dim>
     slip_normal[1][0]=-0.577;   slip_normal[1][1]=0.577;    slip_normal[1][2]=0.577; slip_direction[1][0]=0.0;    slip_direction[1][1]=0.707;    slip_direction[1][2]=-0.707;*/
   
   //for tension test independent slip systems
-  slip_normal[0][0]=0.577;    slip_normal[0][1]=0.577;    slip_normal[0][2]=0.577; slip_direction[0][0]=0.707;  slip_direction[0][1]=-0.707;   slip_direction[0][2]=0.0;
+  // slip_normal[0][0]=0.577;    slip_normal[0][1]=0.577;    slip_normal[0][2]=0.577; slip_direction[0][0]=0.707;  slip_direction[0][1]=-0.707;   slip_direction[0][2]=0.0;
   /* slip_normal[1][0]=-0.577;   slip_normal[1][1]=-0.577;   slip_normal[1][2]=0.577; slip_direction[1][0]=-0.707; slip_direction[1][1]=0.707;    slip_direction[1][2]=0.0;
   /*slip_normal[2][0]=-0.577;   slip_normal[2][1]=0.577;    slip_normal[2][2]=0.577; slip_direction[2][0]=0.0;    slip_direction[2][1]=0.707;    slip_direction[2][2]=-0.707;
   slip_normal[3][0]=0.577;    slip_normal[3][1]=-0.577;   slip_normal[3][2]=0.577; slip_direction[3][0]=0.0;    slip_direction[3][1]=-0.707;   slip_direction[3][2]=-0.707;*/
 
 
   
-  /*slip_normal[0][0]=0.577;    slip_normal[0][1]=0.577;    slip_normal[0][2]=0.577; slip_direction[0][0]=0.707;  slip_direction[0][1]=-0.707;   slip_direction[0][2]=0.0;
-  slip_normal[1][0]=0.577;    slip_normal[1][1]=0.577;    slip_normal[1][2]=0.577; slip_direction[1][0]=-0.707; slip_direction[1][1]=0.0;      slip_direction[1][2]=0.707;
+  slip_normal[0][0]=0.577;    slip_normal[0][1]=0.577;    slip_normal[0][2]=0.577; slip_direction[0][0]=0.707;  slip_direction[0][1]=-0.707;   slip_direction[0][2]=0.0;
+  /* slip_normal[1][0]=0.577;    slip_normal[1][1]=0.577;    slip_normal[1][2]=0.577; slip_direction[1][0]=-0.707; slip_direction[1][1]=0.0;      slip_direction[1][2]=0.707;
   slip_normal[2][0]=0.577;    slip_normal[2][1]=0.577;    slip_normal[2][2]=0.577; slip_direction[2][0]=0.0;    slip_direction[2][1]=0.707;    slip_direction[2][2]=-0.707;
   slip_normal[3][0]=-0.577;   slip_normal[3][1]=0.577;    slip_normal[3][2]=0.577; slip_direction[3][0]=0.707;  slip_direction[3][1]=0.0;      slip_direction[3][2]=0.707;
   slip_normal[4][0]=-0.577;   slip_normal[4][1]=0.577;    slip_normal[4][2]=0.577; slip_direction[4][0]=-0.707; slip_direction[4][1]=-0.707;   slip_direction[4][2]=0.0;
@@ -791,7 +791,7 @@ void DiffRotation(std::vector<FullMatrix<double> >& diffRotationMatrices, std::v
     
     for(unsigned int i=0;i<dim;i++){
       for(unsigned int j=0;j<dim;j++){
-	dRotation(i,j)+=(-0.00000)*RotationMatrices[I][i][j];
+	dRotation(i,j)+=(-lambda1)*RotationMatrices[I][i][j];
       }
     }
     diffRotationMatrices.push_back(dRotation);

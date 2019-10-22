@@ -3,8 +3,8 @@
 //#define problemWidth 10
 #define problemWidth 10.0
 #define problemHeight 100.0
-#define NumMeshPoints 3
-#define refinementFactor 1
+#define NumMeshPoints 2
+#define refinementFactor 0
 
 
 //mechanics properties
@@ -28,8 +28,9 @@
 #define totalDOF n_diff_grains+DIMS
 #define InterfaceEnergyParameter {1.0e-3, 1.0e-3, 1.0e-3} //{Kx, Ky, Kz}
 //#define InterfaceEnergyParameter {2, 2, 2} //{Kx, Ky, Kz}
-#define L1 1
+#define L1 0.0
 #define alpha1 1
 #define beta1 1
 #define gamma1 1
+#define lambda1 1.0e-5
 
