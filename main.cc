@@ -24,14 +24,13 @@ namespace elasticity1
   public:
     std::vector<Point<dim> >* grainPoints;
     std::vector<unsigned int> * grainID;
-    InitialCondition(std::vector<Point<dim> >*_grainPoints, std::vector<unsigned int>*_grainId):Function<dim>(totalDOF), grainPoints(_grainPoints),grainID(_grainId){}
+    unsigned int n_seed_points;
+    InitialCondition(std::vector<Point<dim> >*_grainPoints, std::vector<unsigned int>*_grainId, unsigned int _n_seed_points):Function<dim>(totalDOF), grainPoints(_grainPoints),grainID(_grainId),n_seed_points(_n_seed_points){}
     void vector_value(const Point<dim> &p, Vector<double>&values)const{
       Assert(values.size()==totalDOF, ExcDimensionMismatch(values.size(),totalDOF));
       // initial 3 components of values denote displacement, rest of the components denote phase field parameter
       values(0)=0.;values(1)=0.; values(2)=0.;
-      /*for(int i=0;i<n_diff_grains;i++){
-	values(i)=((double)(std::rand()%100))/100;
-      }*/
+
       Table<1, double> distance(n_seed_points);
       for(unsigned int i=0;i<n_seed_points;i++){
 	distance[i]=p.distance((*grainPoints)[i]);
@@ -44,11 +43,11 @@ namespace elasticity1
       unsigned int g_id=(*grainID)[min];
       for(unsigned int i=0;i<n_diff_grains;i++){
 	if(i==g_id) {
-	  values(dim+i)=(double)(i+1.0)+(double)(1.0-(std::rand()%100)/100.0)*0.03;
+	  values(dim+i)=0.99;
 	  //std::cout << i << " ";
 	}
 	else{
-	  values(dim+i)=0.;
+	  values(dim+i)=0.01;
 	}
       }
       
@@ -89,6 +88,7 @@ namespace elasticity1
     TimerOutput                               computing_timer;
     std::vector<Point<dim> >                  grain_seeds;
     std::vector<unsigned int>                 grain_ID;
+    unsigned int                              n_seed_points;
     //solution variables
     unsigned int currentIncrement, currentIteration;
     double totalTime, currentTime, dt;
@@ -132,6 +132,10 @@ namespace elasticity1
     if (dim==3) {nodal_solution_names_L2.push_back("Gamma3"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);}
     nodal_solution_names_L2.push_back("random"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
 
+    for(char i=0;i<dim+n_diff_grains-4;i++){
+      sprintf(buffer,"field%u",i);
+      nodal_solution_names_L2.push_back(buffer); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
+    }
     //seed random neumber generator
     std::srand(std::time(nullptr)); 
   }
@@ -211,7 +215,7 @@ namespace elasticity1
    }
    std::vector<bool> uBCX1 (totalDOF, false); uBCX1[0]=true;
    if (currentIncrement<10){
-     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.00001, totalDOF), constraints, uBCX1);
+     VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0001, totalDOF), constraints, uBCX1);
    }
    else{
      VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.0005, totalDOF), constraints, uBCX1);
@@ -224,16 +228,70 @@ namespace elasticity1
 
    }
   //grain id generation
+
   template<int dim>
   void elasticity<dim>::grain_generation(){
-
+    Point<dim>grain;
+    std::srand(0.45);
+    n_seed_points=N_seed_points;
     for(unsigned int i=0;i<n_seed_points;i++){
-      grain_seeds.push_back(Point<dim>());
-      grain_seeds[i][0]=((double)(std::rand()%problemWidth))-(problemWidth/2.0);
-      grain_seeds[i][1]=((double)(std::rand()%problemWidth))-(problemWidth/2.0);
-      grain_seeds[i][2]=((double)(std::rand()%problemHeight))-(problemHeight/2.0);
+      grain[0]=(std::rand()%10)-5;
+      grain[1]=(std::rand()%10)-5;
+      grain[2]=(std::rand()%100)-50;
+      grain_seeds.push_back(grain);
     }
-    //assign grain_ID to each seed point
+    for(unsigned int i=0;i<n_diff_grains;i++){
+      grain_ID.push_back(i);
+    }
+    
+  }
+
+
+  
+  /*template <int dim>
+  void elasticity<dim>::grain_generation () {
+    n_seed_points=N_seed_points;
+    double radii=problemWidth/(std::sqrt(n_seed_points));
+    //pcout<<"radii"<<radii<<"\n";
+    Point<dim> grain;
+    std::srand(4.79);
+    //srand (time(NULL));
+    grain[0]=((double)((std::rand())%100)/100)-0.5;
+    grain[1]=((double)((std::rand())%100)/100)-0.5;
+    grain[2]=((double)((std::rand())%100)/100)-0.5;
+    grain_seeds.push_back(grain);
+    
+    for(unsigned int I=1;I<n_seed_points;I++){
+      Point<dim>grain;
+      unsigned int ctr=1, cntr=0, cond=1;
+      while(ctr>0){
+	cntr++;ctr=0;
+	if(cntr==200000){cond=0; break;}
+	Table<1, double>distance(I);
+	for(unsigned int k=0;k<I;k++)distance[k]=0.;
+	grain[0]=((double)(std::rand()%100)/100)-0.5;
+	grain[1]=((double)(std::rand()%100)/100)-0.5;
+	grain[2]=((double)((std::rand())%100)/100)-0.5;
+	for(unsigned int k=0;k<I;k++){
+	  distance[k]=grain.distance(grain_seeds[k]);
+	  if(distance[k]<radii)ctr++;
+	}
+	
+	//while ends here
+      }
+      if(cond==0){n_seed_points=I;break;}
+      grain_seeds.push_back(grain);
+      //for loop ends for generating points
+    }
+    double min=0.;
+    min=grain_seeds[0].distance(grain_seeds[1]);
+    for(unsigned int i=0;i<n_seed_points;i++){
+      for(unsigned int j=i+1;j<n_seed_points;j++){
+	if(grain_seeds[i].distance(grain_seeds[j])<min)min=grain_seeds[i].distance(grain_seeds[j]);
+      }
+    }
+    std::cout<<"number of seed points"<<n_seed_points<<"minimum distance="<<min;
+    // exit(-1);
     for(unsigned int i=0;i<n_seed_points;i++){
       if(i<n_diff_grains)grain_ID.push_back(i);
       else{
@@ -260,7 +318,10 @@ namespace elasticity1
 	//else ends
       }
     }
-  }
+    
+    
+  }*/
+  
   
   
   //Setup
@@ -310,8 +371,8 @@ namespace elasticity1
 	  //history[cell].back()->Grain_Id=0;
 	  //history[cell].back()->orientationAngle=0;
 	  for(unsigned int i=0;i<n_slip_systems;i++){
-	    history[cell].back()->CRSS[i]=0.0016;
-	    history[cell].back()->CRSS_iteration[i]=0.0016;
+	    history[cell].back()->CRSS[i]=0.50;
+	    history[cell].back()->CRSS_iteration[i]=0.50;
 	    history[cell].back()->Gamma_iteration[i]=0.;
 	    history[cell].back()->Gamma[i]=0.;
 	    history[cell].back()->shear_Stress_iteration[i]=0.;
@@ -367,12 +428,19 @@ namespace elasticity1
 	getDeformationMap<double, dim>(fe_values, 0, ULocal, defMap, currentIteration);
 
 	//pasing a reference of map to residual function in order to store all stress, strain, back_stress, slip_rate at current cell
-	residualForMechanics(fe_values, 0, ULocal, ULocalConv, defMap, currentIteration, currentIncrement, history[cell], local_rhs, local_matrix,  grain_seeds,grain_ID);
+	residualForMechanics(fe_values, 0, ULocal, ULocalConv, defMap, currentIteration, currentIncrement, history[cell], local_rhs, local_matrix,  grain_seeds,grain_ID, n_seed_points);
 	
-	residualForChemo(fe_values, dim, fe_face_values, cell,  dt, ULocal, ULocalConv,local_rhs, local_matrix);//DOF component 0 if only chemo, dim for coupling---for mechanics switch residualChemo off
+	residualForChemo( fe_values,  dim,  fe_face_values, cell,  dt,  ULocal, ULocalConv,local_rhs, local_matrix);//DOF component 0 if only chemo, dim for coupling---for mechanics switch residualChemo off
 	
 	for(unsigned int i=0;i<dofs_per_cell;i++){ local_rhs[i]=-local_rhs[i];}//all residual terms negative
 
+	/*for(unsigned int i=0;i<dofs_per_cell;i++){
+	  for(unsigned int j=0;j<dofs_per_cell;j++){
+	    std::cout<<local_matrix(i,j)<<" ";
+	  }std::cout<<"\n";
+	}
+	exit(-1);
+	*/
 	if ((currentIteration==0)){
 	  constraints.distribute_local_to_global (local_matrix, local_rhs, local_dof_indices, system_matrix, system_rhs);
 	}
@@ -425,6 +493,13 @@ namespace elasticity1
 	    }
 	  }
 	}
+	for(unsigned int i=0;i<dofs_per_cell;i++){
+	  for(unsigned int j=0;j<dofs_per_cell;j++){
+	    std::cout<<local_matrix(i,j)<<" ";
+	  }std::cout<<"\n";
+	}
+	std::cout<<"dofs_per_cell"<<dofs_per_cell;
+	exit(-1);
 	
 	//assemble
 	constraints_L2.distribute_local_to_global (local_matrix, local_rhs, local_dof_indices, mass_matrix, system_rhs);
@@ -433,74 +508,96 @@ namespace elasticity1
     system_rhs.compress (VectorOperation::add);
 
     //solve
-    //solveIteration(true);
+    solveIteration(true);
    
     //
     
   }
 
   //Solve
-  template <int dim>
+template <int dim>
   void elasticity<dim>::solveIteration(bool isProject){
     TimerOutput::Scope t(computing_timer, "solve");
     LA::MPI::Vector completely_distributed_solution (locally_owned_dofs, mpi_communicator);
-    /*    
-    //Iterative solvers from Petsc and Trilinos
-    SolverControl solver_control (dof_handler.n_dofs(), 1e-12);
+      
+    //check for convergence of iterative solver, and in case of slow convergence for smaller problem switch to Direct Solver.  
+    //try
+      {
+      //Iterative solvers from Petsc and Trilinos
+      SolverControl solver_control (dof_handler.n_dofs(), 1e-12);
 #ifdef USE_PETSC_LA
-    LA::SolverGMRES solver(solver_control, mpi_communicator);
+      LA::SolverGMRES solver(solver_control, mpi_communicator);
 #else
-    LA::SolverGMRES solver(solver_control);
+      LA::SolverGMRES solver(solver_control);
 #endif
-    LA::MPI::PreconditionAMG preconditioner;
-    LA::MPI::PreconditionAMG::AdditionalData data;
+      LA::MPI::PreconditionJacobi preconditioner;
+      LA::MPI::PreconditionJacobi::AdditionalData data;
 #ifdef USE_PETSC_LA
-    //data.symmetric_operator = true;
+      //data.symmetric_operator = true;
 #else
-    // Trilinos defaults are good 
+      // Trilinos defaults are good 
 #endif
-    preconditioner.initialize(system_matrix, data);
-    solver.solve (system_matrix, completely_distributed_solution, system_rhs, preconditioner);
-    pcout << "   Solved in " << solver_control.last_step()
-          << " iterations." << std::endl;
-    */
-    //Direct solver MUMPS
-    SolverControl cn;
-    PETScWrappers::SparseDirectMUMPS solver(cn, mpi_communicator);
-    if(!isProject){
-      //solver.set_symmetric_mode(false);
-      //system_matrix.print(std::cout);
-      solver.solve(system_matrix, completely_distributed_solution, system_rhs);
-      //
-      if ((currentIteration==0)){
-	constraints.distribute (completely_distributed_solution);
+      if(!isProject){
+	preconditioner.initialize(system_matrix, data);
+	solver.solve (system_matrix, completely_distributed_solution, system_rhs, preconditioner);
+	if(currentIteration==0){
+	  constraints.distribute (completely_distributed_solution);
+	}
+	else{
+	  constraints2.distribute (completely_distributed_solution);
+	}
+	locally_relevant_solution = completely_distributed_solution;
+	dU = completely_distributed_solution;
       }
       else{
-	constraints2.distribute (completely_distributed_solution);
+	preconditioner.initialize(mass_matrix, data);
+	solver.solve (mass_matrix, completely_distributed_solution, system_rhs, preconditioner);
+	constraints_L2.distribute(completely_distributed_solution);
+	locally_relevant_solution_L2=completely_distributed_solution;
+	U_L2=completely_distributed_solution;
+	UGhost_L2=U_L2;
       }
-      locally_relevant_solution = completely_distributed_solution;
-      dU = completely_distributed_solution;
+      pcout << "   Solved in " << solver_control.last_step()
+	    << " iterations." << std::endl;
     }
-    else
-      {
-	//solver.set_symmetric_mode(true);
-	solver.solve(mass_matrix, completely_distributed_solution, system_rhs);
-	constraints_L2.distribute (completely_distributed_solution);
-	locally_relevant_solution_L2 = completely_distributed_solution;
-	U_L2 = completely_distributed_solution;
-	UGhost_L2 = U_L2;
+    
+    /*catch(...){
+      //Direct solver MUMPS
+      SolverControl cn;
+      PETScWrappers::SparseDirectMUMPS solver(cn, mpi_communicator);
+      if(!isProject){
+	solver.set_symmetric_mode(false);
+	solver.solve(system_matrix, completely_distributed_solution, system_rhs);
+
+	if((currentIteration==0)){
+	  constraints.distribute (completely_distributed_solution);
+	}
+	else{
+	  constraints2.distribute(completely_distributed_solution);
+	}
+	locally_relevant_solution = completely_distributed_solution;
+	dU = completely_distributed_solution;
       }
-  }
+      else{
+	solver.set_symmetric_mode(true);
+	solver.solve(mass_matrix, completely_distributed_solution, system_rhs);
+	constraints_L2.distribute(completely_distributed_solution);
+	locally_relevant_solution_L2=completely_distributed_solution;
+	U_L2=completely_distributed_solution;
+	UGhost_L2=U_L2;
+      }*/
+    
+}
 
   //Solve
   template <int dim>
   void elasticity<dim>::solve(){
-    double res=1, tol=1.0e-8, abs_tol=1.0e-14, initial_norm=0, current_norm=0;
+    double res=1, tol=1.0e-8, abs_tol=1.0e-10, initial_norm=0, current_norm=0;
     double machineEPS=1.0e-15;
     currentIteration=0;
     char buffer[200];
     while (true){
-      if (currentIteration>=200){sprintf(buffer, "maximum number of iterations reached without convergence. \n"); pcout<<buffer; break; exit (1);}
+      if (currentIteration>=20){sprintf(buffer, "maximum number of iterations reached without convergence. \n"); pcout<<buffer; break; exit (1);}
       if (current_norm>1/std::pow(tol,2)){sprintf(buffer, "\n norm is too high. \n\n"); pcout<<buffer; break; exit (1);}
       assemble_system();
       current_norm=system_rhs.l2_norm();
@@ -524,7 +621,7 @@ namespace elasticity1
     data_out.attach_dof_handler (dof_handler);
    
     data_out.add_data_vector (UnGhost, nodal_solution_names, DataOut<dim>::type_dof_data, nodal_data_component_interpretation);
-    //data_out.add_data_vector (UGhost_L2, nodal_solution_names_L2, DataOut<dim>::type_dof_data, nodal_data_component_interpretation_L2);
+    data_out.add_data_vector (UGhost_L2, nodal_solution_names_L2, DataOut<dim>::type_dof_data, nodal_data_component_interpretation_L2);
 
     Vector<float> subdomain (triangulation.n_active_cells());
     for (unsigned int i=0; i<subdomain.size(); ++i)
@@ -588,7 +685,7 @@ namespace elasticity1
    
     //setup initial conditions
     
-    VectorTools::interpolate(dof_handler, InitialCondition<dim>(&grain_seeds, &grain_ID), U); Un=U;
+    VectorTools::interpolate(dof_handler, InitialCondition<dim>(&grain_seeds, &grain_ID,n_seed_points), U); Un=U;
     //U=0.0;
     // 
     //sync ghost vectors to non-ghost vectors

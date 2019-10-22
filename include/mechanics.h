@@ -14,57 +14,83 @@
 template <int dim>
 struct historyVariables{
 public:
-  historyVariables<dim>():  Fp_previous(dim, dim), Fp_previousIteration(dim, dim), Gamma(n_slip_systems),slipRates(n_slip_systems), CRSS(n_slip_systems), CRSS_iteration(n_slip_systems), Gamma_iteration(n_slip_systems),shear_Stress(n_slip_systems), shear_Stress_iteration(n_slip_systems),Gamma_total(n_slip_systems){}
+  historyVariables<dim>():  Fp_previous(dim, dim), Fp_previousIteration(dim, dim), Gamma(n_slip_systems),slipRates(n_slip_systems), CRSS(n_slip_systems), CRSS_iteration(n_slip_systems), Gamma_iteration(n_slip_systems),shear_Stress(n_slip_systems), shear_Stress_iteration(n_slip_systems),Gamma_total(n_slip_systems),orientationAngle(n_diff_grains){}
   Table<1, std::vector<double> >slipRates;
   double eqvstress, equvStrain;
-  unsigned int Grain_Id;double orientationAngle;
+  unsigned int Grain_Id;//double orientationAngle;
+  Table<1, double> orientationAngle;
   Table<1, double>CRSS, CRSS_iteration;
   Table<1, double> Gamma,Gamma_iteration,Gamma_total ;
   Table<1, double>shear_Stress, shear_Stress_iteration;
   FullMatrix<double> Fp_previous, Fp_previousIteration;
   double vonMissesStress, vonMissesStrain;
+  double grainID;
 };
 
 template<int dim>
-void assign_grain_id(FEValues<dim>&fe_values, std::vector<Point<dim> >&grain_seeds ,unsigned int &q, unsigned int &grain_id,double angle,std::vector<unsigned int>&grain_ID){
-   Point<dim> quadPoint=fe_values.quadrature_point(q);
-   //std::cout<<quadPoint[0]<<" "<<quadPoint[1]<<" "<<quadPoint[2]<<"\n";
+void assign_grain_id(FEValues<dim>&fe_values, std::vector<Point<dim> >&grain_seeds ,unsigned int &q, unsigned int &grain_id,Table<1, double>& angle,std::vector<unsigned int>&grain_ID, unsigned int n_seed_points){
+  Point<dim> quadPoint=fe_values.quadrature_point(q);
   //assign grain id to the quadrature point
   
-   Table<1, double>distance(n_seed_points);
-   for(unsigned int i=0;i<n_seed_points;i++){
-     distance[i]=quadPoint.distance(grain_seeds[i]);
-   }
+  Table<1, double>distance(n_seed_points);
+  for(unsigned int i=0;i<n_seed_points;i++){
+    distance[i]=quadPoint.distance(grain_seeds[i]);
+  }
+  
+  double min_d=distance[0]; grain_id=0;
+  for(unsigned int i=1;i<n_seed_points;i++){
+    if(distance[i]<min_d){grain_id=i; min_d=distance[i];}
+  }
+  grain_id=grain_ID[grain_id];
+ 
+  std::srand(4.23);
+  for(unsigned int i=0;i<n_diff_grains;i++){
+    angle[i]=(double)(std::rand()%360);
+  }
 
-   double min_d=distance[0]; grain_id=0;
-   for(unsigned int i=1;i<n_seed_points;i++){
-     if(distance[i]<min_d){grain_id=i; min_d=distance[i];}
-     //std::cout << grain_id << " ";
-   }
-   //std::cout<<"\n";
-   grain_id=grain_ID[grain_id];
-   switch(grain_id){
-   case 0: angle=20.0;break;
-   case 1: angle=35.0;break;
-   case 2: angle=50.0;break;
-   case 3: angle=75.0;break;
-   case 4: angle=90.0;break;
-   default: angle=0.;break;
-   }
-
+  
 }
 
 
 template<int dim>
-void crystal_rotation(Table<2, double>&slip_normal, Table<2, double>&slip_direction,double theta){
+void crystal_rotation(Table<2, double>&slip_normal, Table<2, double>&slip_direction,Table<1, double>& angle, Table<1, double>&phi, std::vector<FullMatrix<double> >&RotationMatrices, FullMatrix<double>& QuadRotation){
+  
   unsigned int n=dim;
+  //std::vector<FullMatrix<double> >RotationMatrices;
+  for(unsigned int I=0;I<n_diff_grains;I++){
+    double param=angle[I]*PI/180.0;
+    
+    FullMatrix<double> Rx(dim, dim), Ry(dim, dim), Rz(dim, dim), Rotation(dim, dim);
 
-  FullMatrix<double> Rx, Ry, Rz;
-  Rx=IdentityMatrix(n);Ry=IdentityMatrix(n); Rz=IdentityMatrix(n);
-  double param=theta*PI/180;
-  Rx(1,1)=cos(param); Rx(2,2)=cos(param); Rx(1,2)=-sin(param); Rx(2,1)=sin(param);
-  Ry(0,0)=cos(param); Rx(2,2)=cos(param); Rx(0,2)=sin(param); Rx(2,0)=-sin(param);
-  Rz(0,0)=cos(param); Rx(1,1)=cos(param); Rx(0,1)=-sin(param); Rx(1,0)=sin(param);
+    for(unsigned int i=0;i<dim;i++){
+      for(unsigned int j=0;j<dim;j++){
+	Rx(i,j)=(double)(i==j);
+	Ry(i,j)=(double)(i==j);
+	Rz(i,j)=(double)(i==j);
+      }
+    }
+    Rx(1,1)=cos(param); Rx(2,2)=cos(param); Rx(1,2)=-sin(param); Rx(2,1)=sin(param);
+    Ry(0,0)=cos(param); Ry(2,2)=cos(param); Ry(0,2)=sin(param);  Ry(2,0)=-sin(param);
+    Rz(0,0)=cos(param); Rz(1,1)=cos(param); Rz(0,1)=-sin(param); Rz(1,0)=sin(param);
+ 
+    for(unsigned int i=0;i<dim;i++)
+      for(unsigned int j=0;j<dim;j++)
+	for(unsigned int k=0;k<dim;k++)
+	  for(unsigned int l=0;l<dim;l++)
+	    Rotation(i,l)+=Rx(i,j)*Ry(j,k)*Rz(k,l);
+    RotationMatrices.push_back(Rotation);
+  }
+
+  //  FullMatrix<double> QuadRotation(dim, dim);
+  for(unsigned int I=0;I<n_diff_grains;I++){
+    for(unsigned int i=0;i<dim;i++){
+      for(unsigned int j=0;j<dim;j++){
+	QuadRotation(i,j)+=phi[I]*RotationMatrices[I](i,j);
+      }
+    }
+  }
+
+  
   Table<2, double>normals(n_slip_systems,dim), directions(n_slip_systems, dim);
   for(unsigned int i=0;i<n_slip_systems;i++){
     for(unsigned int j=0;j<dim;j++){
@@ -74,23 +100,17 @@ void crystal_rotation(Table<2, double>&slip_normal, Table<2, double>&slip_direct
       slip_direction[i][j]=0.;
     }
   }
-  for(unsigned int i=0;i<n_slip_systems;i++){
-    for(unsigned int j=0;j<dim;j++){
-      for(unsigned int k=0;k<dim;k++){
-	for(unsigned int l=0;l<dim;l++){
-	  for(unsigned int m=0;m<dim;m++){
-	    slip_normal[i][j]+=Rx(j,k)*Ry(k,l)*Rz(l,m)*normals[i][m];
-	    slip_direction[i][j]+=Rx(j,k)*Ry(k,l)*Rz(l,m)*directions[i][m];
-	  }
-	}
+
+  for(unsigned int I=0;I<n_slip_systems;I++){
+    for(unsigned int i=0;i<dim;i++){
+      for(unsigned int j=0;j<dim;j++){
+	slip_normal[I][i]+=QuadRotation(i,j)*normals[I][j];
+	slip_direction[I][i]+=QuadRotation(i,j)*directions[I][i];
       }
     }
-    
   }
-  
 
-  
-  
+  //function definition ends  
 }
 
 template<class T, int dim>
@@ -129,11 +149,26 @@ template<class T, int dim>
 
 
 template<class T,int dim>
-  void calculate_stress_strain(FullMatrix<T>& F, FullMatrix<T>& Fp,FullMatrix<T>& F_e,FullMatrix<T>& R_cauchy_green, Table<2,T>& E, Table<2,T>& SPK, Table<2,T>& Kirchhoff_stress,Table<2,T>& CauchyStress, Table<2,T>& Piola_stress, Table<4,T>& ElasticModulii){
+  void calculate_stress_strain(FullMatrix<T>& F, FullMatrix<T>& Fp,FullMatrix<T>& F_e,FullMatrix<T>& R_cauchy_green, Table<2,T>& E, Table<2,T>& SPK, Table<2,T>& Kirchhoff_stress,Table<2,T>& CauchyStress, Table<2,T>& Piola_stress, Table<4,T>& ElasticModulii, Table<2, T>& QuadRotation){
   FullMatrix<double>Fp_inv(dim, dim),F_inv(dim, dim);
   Fp_inv.invert(Fp);F_inv.invert(F);
   double det_F;
   det_F=F.determinant();
+  Table<2, double> E_prime(dim, dim);
+
+  for(unsigned int i=0;i<dim;i++){
+    for(unsigned int j=0;j<dim;j++){
+      F_e(i,j)=0.;
+      R_cauchy_green(i,j)=0.;
+      E[i][j]=0.;
+      E_prime[i][j]=0.;
+      SPK[i][j]=0.;
+      Kirchhoff_stress[i][j]=0.;
+      CauchyStress[i][j]=0.;
+      Piola_stress[i][j]=0.;
+    }
+  }
+  
   for(unsigned int i=0;i<dim;i++)
     for(unsigned int j=0;j<dim;j++)
       for(unsigned int k=0;k<dim;k++)
@@ -144,7 +179,21 @@ template<class T,int dim>
 	R_cauchy_green(i,j)+=F_e(k,i)*F_e(k,j);
   for(unsigned int i=0;i<dim;i++)
     for(unsigned int j=0;j<dim;j++)
-      E[i][j]+=0.5*(R_cauchy_green[i][j]-(double)(i==j));
+      E_prime[i][j]+=0.5*(R_cauchy_green[i][j]-(double)(i==j));//
+
+
+  for(unsigned int i=0;i<dim;i++){
+    for(unsigned int j=0;j<dim;j++){
+      E[i][j]=E_prime[i][j]-(0.00001)*QuadRotation[i][j];
+    }
+  }
+
+  /*for(int i=0;i<dim;i++){
+    for(int j=0;j<dim;j++){
+      std::cout<<E[i][j]<<" ";
+    }std::cout<<"\n";
+  }*/
+    //exit(-1);
   for(unsigned int i=0;i<dim;i++)
     for(unsigned int j=0;j<dim;j++)
       for(unsigned int k=0;k<dim;k++)
@@ -235,7 +284,7 @@ template<class T, int dim>
    
    
     if(((std::abs(shearStress[I]))-crss[I])>std::abs(0.001*crss[I])){
-      //std::cout<<shearStress[I]<<" "<<crss[I]<<"\n";
+      // std::cout<<shearStress[I]<<" "<<crss[I]<<"\n";
       _ActiveSystems.push_back(I); 
     }
   }
@@ -281,17 +330,37 @@ template<class T,int dim>
 
 //mechanics implementation
 template <class T, int dim>
-  void evaluateStress(unsigned int q, const unsigned int DOF, const Table<1, T>& ULocal, const deformationMap<T, dim>& defMap, unsigned int currentIteration,unsigned int currentIncrement,  std::vector<historyVariables<dim>*>& history, Table<2, double>& Kirchhoff_stress, Table<2, double>& Piola_stress, Table<4,double>& C,  Table<2,double>& invF, FEValues<dim>& fe_values, std::vector<Point<dim> >&grain_seeds,std::vector<unsigned int>&grain_ID){
+  void evaluateStress(unsigned int q, const unsigned int DOF, const Table<1, T>& ULocal,const Table<1, double>&ULocalConv, const deformationMap<T, dim>& defMap, unsigned int currentIteration,unsigned int currentIncrement,  std::vector<historyVariables<dim>*>& history, Table<2, double>& Kirchhoff_stress, Table<2, double>& Piola_stress, Table<4,double>& C,  Table<2,double>& invF, FEValues<dim>& fe_values, std::vector<Point<dim> >&grain_seeds,std::vector<unsigned int>&grain_ID, unsigned int n_seed_points, std::vector<FullMatrix<double> >&RotationMatrices, Table<2, T>&LagrangeStrain){
  
   
   //update history variables at the start of increment
   if (currentIteration==0){
     if(currentIncrement==1){
       unsigned int grain_id=0;
-      double angle=0.;
-      assign_grain_id<dim>(fe_values,grain_seeds,q,grain_id,angle,grain_ID);
-      history[q]->Grain_Id=grain_id+1;
+      Table<1,double> angle(n_diff_grains);
+      for(unsigned int i=0;i<n_diff_grains;i++)angle[i]=0.;
+      unsigned int dofs_per_cell= fe_values.dofs_per_cell;
+      
+      assign_grain_id<dim>(fe_values,grain_seeds,q,grain_id,angle,grain_ID,n_seed_points);
       history[q]->orientationAngle=angle;
+      Table<1, double> c_conv(n_diff_grains);
+      for(unsigned int i=0;i<n_diff_grains;i++)c_conv[i]=0.;
+      for(unsigned int i=0;i<dofs_per_cell;i++){
+	 int ci=fe_values.get_fe().system_to_component_index(i).first - dim;
+	if(ci>=0){
+	  c_conv[ci]+=fe_values.shape_value(i,q)*ULocalConv[i];
+	}
+      }
+      
+      unsigned int ctr=0, id=0;
+      for(unsigned int i=0;i<n_diff_grains;i++){
+	if(c_conv[i]>0.9){id=5*(i+1); break;}
+	else {ctr++;}
+      }
+      if(ctr==n_diff_grains){history[q]->Grain_Id=-10;}
+      else{history[q]->Grain_Id=id;}
+      
+      
     }
     history[q]->Fp_previous=history[q]->Fp_previousIteration;
     history[q]->CRSS=history[q]->CRSS_iteration;
@@ -347,9 +416,9 @@ template <class T, int dim>
  
  
   
-  FullMatrix<double> F(dim, dim),F_inv(dim, dim),Fp(dim, dim),Fp_inv(dim, dim),F_e(dim, dim),Fe_inv(dim, dim), Rotation(dim, dim), R_cauchy_green(dim, dim);
+  FullMatrix<double> F(dim, dim),F_inv(dim, dim),Fp(dim, dim),Fp_inv(dim, dim),F_e(dim, dim),Fe_inv(dim, dim), Rotation(dim, dim), R_cauchy_green(dim, dim), QuadRotation(dim, dim);
   
-  Table<2, double> Stress(dim, dim), E(dim, dim), SPK(dim, dim), CauchyStress(dim, dim), B_beta(dim, dim);
+  Table<2, double> Stress(dim, dim), E(dim, dim), SPK(dim, dim), CauchyStress(dim, dim), B_beta(dim, dim), E_prime(dim, dim);
   Table<4, double>ElasticModulii(dim, dim, dim, dim), _ElasticModulii(dim, dim, dim, dim);
   std::vector<Table<2,double> > SchmidtTensor, SchmidtTensorUnsym, OriginalSchmidt;
   Table<1, double>   shearStress(n_slip_systems), crss(n_slip_systems);
@@ -364,8 +433,21 @@ template <class T, int dim>
   double det_F=0.;
   double theta=0.0;
   Table<2, double> Identity(dim, dim);
+  unsigned int dofs_per_cell=fe_values.dofs_per_cell;
+  Table<1, double>phi(n_diff_grains);
+  for(unsigned int i=0;i<n_diff_grains;i++)phi[i]=0.;
+  // std::vector<FullMatrix<double> >RotationMatrices;
+  for(unsigned int A=0;A<dofs_per_cell;A++){
+    unsigned int ca=fe_values.get_fe().system_to_component_index(A).first-dim;
+    if(ca>=0 && ca<n_diff_grains){
+      phi[ca]+=fe_values.shape_value(A,q)*ULocal[A];
+    }
+  }
   
-  crystal_rotation<dim>(slip_normal, slip_direction,history[q]->orientationAngle);
+  //  for(int i=0;i<n_diff_grains;i++)std::cout<<phi[i]<<" ";std::cout<<"\n";
+  
+  
+  crystal_rotation<dim>(slip_normal, slip_direction,history[q]->orientationAngle,phi, RotationMatrices, QuadRotation);
   
   //define ElasticModulii
   for(unsigned int i=0;i<dim;i++)
@@ -387,18 +469,12 @@ template <class T, int dim>
     crss[i]=0.;
     crss[i]=history[q]->CRSS[i];
   }
-
-  /*if(currentIteration==1){
-    for(unsigned int i=0;i<dim;i++)
-      for(unsigned int j=0;j<dim;j++)
-	std::cout<<F(i,j)<<" ";
-    std::cout<<"\n";
-  }*/
-
+  
+  
   Fp=history[q]->Fp_previous;
   F_inv.invert(F);
   Fp_inv.invert(Fp);F_inv.invert(F);
-  calculate_stress_strain<double, dim>(F,history[q]->Fp_previous,F_e,R_cauchy_green,E,SPK,Kirchhoff_stress, CauchyStress, Piola_stress,ElasticModulii);
+  calculate_stress_strain<double, dim>(F,history[q]->Fp_previous,F_e,R_cauchy_green,E,SPK,Kirchhoff_stress, CauchyStress, Piola_stress,ElasticModulii, QuadRotation);
   find_polar_decomposition<double, dim>(F_e, Rotation);  //polar decomposition of Fe
   calculate_schmidt_tensors<double, dim>(Rotation, slip_normal, slip_direction, SchmidtTensor, SchmidtTensorUnsym, OriginalSchmidt); 
   calculate_shear<double, dim>( SPK, SchmidtTensorUnsym, shearStress, crss, _ActiveSystems);
@@ -425,7 +501,7 @@ template <class T, int dim>
   unsigned int whilecounter=0;
   Vector<double> gamma_total(n_slip_systems);
   if(size>0){
-
+    std::cout<<"plastic";exit(-1);
     FullMatrix<double> active_system_matrix, active_system_inv;
     Vector<double> active_system_rhs;
     Vector<double> gamma;
@@ -617,7 +693,7 @@ template <class T, int dim>
 	F_e.reinit(dim,dim); R_cauchy_green.reinit(dim,dim); E.reinit(dim, dim); SPK.reinit(dim, dim);Kirchhoff_stress.reinit(dim, dim);
 	CauchyStress.reinit(dim, dim); Piola_stress.reinit(dim, dim);Rotation.reinit(dim, dim);
 	Fp_inv.invert(Fp);
-	calculate_stress_strain<double, dim>(F,Fp,F_e,R_cauchy_green,E,SPK,Kirchhoff_stress, CauchyStress, Piola_stress,ElasticModulii);
+	calculate_stress_strain<double, dim>(F,Fp,F_e,R_cauchy_green,E,SPK,Kirchhoff_stress, CauchyStress, Piola_stress,ElasticModulii,QuadRotation);
 	find_polar_decomposition<double, dim>(F_e, Rotation);
 	SchmidtTensor.resize(0);SchmidtTensorUnsym.resize(0); OriginalSchmidt.resize(0);
 	calculate_schmidt_tensors<double, dim>(Rotation, slip_normal, slip_direction, SchmidtTensor, SchmidtTensorUnsym, OriginalSchmidt);
@@ -690,29 +766,82 @@ template <class T, int dim>
     history[q]->shear_Stress_iteration[i]=shearStress[i];
    
   }
+
+  
   
   for(unsigned int i=0;i<dim;i++)
     for(unsigned int j=0;j<dim;j++){
       invF[i][j]=F_inv(i,j);
+      LagrangeStrain[i][j]=E[i][j];
       history[q]->Fp_previousIteration(i,j)=Fp(i,j);
     }
 }
 
 
+//crystalRotation and differentiation matrix
+template<int dim>
+void DiffRotation(std::vector<FullMatrix<double> >& diffRotationMatrices, std::vector<FullMatrix<double> >&RotationMatrices){
+
+
+ 
+  
+  for(unsigned int I=0;I<n_diff_grains;I++){
+
+    FullMatrix<double>dRotation(dim, dim);
+    
+    for(unsigned int i=0;i<dim;i++){
+      for(unsigned int j=0;j<dim;j++){
+	dRotation(i,j)+=(-0.00000)*RotationMatrices[I][i][j];
+      }
+    }
+    diffRotationMatrices.push_back(dRotation);
+  }
+   
+  //function definition ends
+}
+
+
 //mechanics residual implementation
 template <int dim>
-void residualForMechanics(FEValues<dim>& fe_values, unsigned int DOF, Table<1, double >& ULocal, Table<1, double >& ULocalConv, deformationMap<double, dim>& defMap, unsigned int currentIteration,unsigned int currentIncrement,  std::vector<historyVariables<dim>* >& history, Vector<double>& RLocal, FullMatrix<double>& KLocal,std::vector<Point<dim> >&grain_seeds,std::vector<unsigned int>&grain_ID){
+void residualForMechanics(FEValues<dim>& fe_values, unsigned int DOF, Table<1, double >& ULocal, Table<1, double >& ULocalConv, deformationMap<double, dim>& defMap, unsigned int currentIteration,unsigned int currentIncrement,  std::vector<historyVariables<dim>* >& history, Vector<double>& RLocal, FullMatrix<double>& KLocal,std::vector<Point<dim> >&grain_seeds,std::vector<unsigned int>&grain_ID, unsigned int n_seed_points){
   unsigned int dofs_per_cell= fe_values.dofs_per_cell;
   unsigned int n_q_points= fe_values.n_quadrature_points;
   
+
+  double nu=PoissonsRatio;double Y=elasticModulus;
+  double lambda=(nu*Y)/((1+nu)*(1-2*nu)), mu=Y/(2*(1+nu));
   //quadrature loop
+ 
+
   for (unsigned int q=0; q<n_q_points; q++){
-    
+
     //evaluate stress
-    Table<2, double> Kirchhoff_stress(dim, dim), Piola_stress(dim, dim), invF(dim, dim);
-    Table<4,double> C(dim,dim,dim,dim);
-    evaluateStress<double, dim>(q, DOF, ULocal, defMap, currentIteration, currentIncrement, history, Kirchhoff_stress, Piola_stress, C, invF, fe_values,grain_seeds,grain_ID);
+    Table<2, double> Kirchhoff_stress(dim, dim), Piola_stress(dim, dim), invF(dim, dim), LagrangeStrain(dim, dim);
+    FullMatrix<double> InvF(dim, dim),defGrad(dim, dim), dRotation(dim, dim);
+    Table<4,double> C(dim,dim,dim,dim), ElasticModulii(dim, dim, dim, dim), C1(dim, dim, dim, dim);
+    for(unsigned int i=0;i<dim;i++)
+      for(unsigned int j=0;j<dim;j++)
+	for(unsigned int k=0;k<dim;k++)
+	  for(unsigned int l=0;l<dim;l++){
+	    ElasticModulii[i][j][k][l]=0.;
+	    C1[i][j][k][l]=0.;
+	    C[i][j][k][l]=0.;
+	  }
     
+    std::vector<FullMatrix<double> >RotationMatrices,diffRotationMatrices ;
+    evaluateStress<double, dim>(q, DOF, ULocal, ULocalConv, defMap, currentIteration, currentIncrement, history, Kirchhoff_stress, Piola_stress, C, invF, fe_values,grain_seeds,grain_ID,n_seed_points, RotationMatrices, LagrangeStrain);
+ 
+    //std::cout<<"size"<<RotationMatrices.size(); exit(-1);
+    //copy invF and find F(defromation gradient)
+    for(unsigned int i=0;i<dim;i++)
+      for(unsigned int j=0;j<dim;j++)
+	InvF(i,j)=invF[i][j];
+    
+    defGrad.invert(InvF);
+    for(unsigned int i=0;i<dim;i++)for(unsigned int j=0;j<dim;j++)for(unsigned int k=0;k<dim;k++)for(unsigned int l=0;l<dim;l++)ElasticModulii[i][j][k][l]=lambda*(i==j)*(k==l) + mu*((i==k)*(j==l) + (i==l)*(j==k));
+	  
+    for(unsigned int i=0;i<dim;i++)for(unsigned int I=0;I<dim;I++)for(unsigned int j=0;j<dim;j++)for(unsigned int J=0;J<dim;J++)for(unsigned int K=0;K<dim;K++)for(unsigned int L=0;L<dim;L++)C1[i][j][K][L]+=defGrad(i,I)*defGrad(j,J)*ElasticModulii[I][J][K][L];
+
     //evaluate Residual
     for (unsigned int A=0; A<dofs_per_cell; A++) {
       const unsigned int i = fe_values.get_fe().system_to_component_index(A).first - DOF;
@@ -724,12 +853,12 @@ void residualForMechanics(FEValues<dim>& fe_values, unsigned int DOF, Table<1, d
 	  }
 	  //evaluate tangent modulous
 	  for (unsigned int B=0; B<dofs_per_cell; B++) {   
-	    const unsigned int k = fe_values.get_fe().system_to_component_index(B).first - DOF;
+	     unsigned int k = fe_values.get_fe().system_to_component_index(B).first - DOF;
 	    if (k>=0 && k<dim){
 	      //K
 	      for (unsigned int l = 0; l<dim; l++){
 		for (unsigned int J = 0; J<dim; J++){
-		  for (unsigned int L = 0; L<dim; L++){
+		  for (unsigned int L = 0; L<dim; L++){	   
 		    KLocal(A,B)+=fe_values.shape_grad(A,q)[J]*invF[J][j]*C[i][j][k][l]*fe_values.shape_grad(B,q)[L]*invF[L][l]*fe_values.JxW(q);
 		  }
 		}
@@ -756,8 +885,103 @@ void residualForMechanics(FEValues<dim>& fe_values, unsigned int DOF, Table<1, d
     
     
     //end quadrature loop
+
+
+    //coupled Term
+
+    DiffRotation<dim>(diffRotationMatrices, RotationMatrices);
+    for(unsigned int A=0;A<dofs_per_cell;A++){
+      const unsigned int i=fe_values.get_fe().system_to_component_index(A).first - DOF;
+      if(i>=0 && i<dim){
+	for(unsigned int j=0;j<dim;j++){
+	  for(unsigned int J=0;J<dim;J++){
+	    for(unsigned int B=0;B<dofs_per_cell;B++){
+	      unsigned int b=fe_values.get_fe().system_to_component_index(B).first - dim;
+	      if(b>=0 && b<n_diff_grains){
+		for(unsigned int M=0;M<dim;M++){
+		  for(unsigned int N=0;N<dim;N++){
+		    KLocal(A,B)+=fe_values.shape_grad(A,q)[J]*invF[J][j]*C1[i][j][M][N]*diffRotationMatrices[b][M][N]*fe_values.shape_value(B,q)*fe_values.JxW(q);
+		  }
+		}
+	      }
+	    }
+	  }
+	}
+      }
+    }
+
+
+    // residual for chemo... mechanics part
+     for(unsigned int A=0;A<dofs_per_cell;A++){
+      unsigned int ca=fe_values.get_fe().system_to_component_index(A).first-dim;
+      if(ca>=0 && ca<n_diff_grains){
+	double norm=0.;
+	tensor_triple_contraction<double, dim>(ElasticModulii,LagrangeStrain,diffRotationMatrices[ca],norm);
+	RLocal[A]-=fe_values.shape_value(A,q)*norm*fe_values.JxW(q);
+      }
+    }
+
+    //jacobian matrix contribution J21...from R2/ see readMe.txt file in the commmit
+
+    Table<4, double> C21(dim, dim, dim, dim);
+    for(unsigned int i=0;i<dim;i++)for(unsigned int j=0;j<dim;j++)for(unsigned int k=0;k<dim;k++)for(unsigned int l=0;l<dim;l++)C21[i][j][k][l]=0.;
+
+    for(unsigned int i=0;i<dim;i++){
+      for(unsigned int I=0;I<dim;I++){
+	for(unsigned int J=0;J<dim;J++){
+	  for(unsigned int K=0;K<dim;K++){
+	    for(unsigned int L=0;L<dim;L++){
+	      C21[I][i][K][L]+=defGrad(i,J)*ElasticModulii[I][J][K][L];
+	    }
+	  }
+	}
+      }
+    }
+    
+    for(unsigned int A=0;A<dofs_per_cell;A++){
+      int ca=fe_values.get_fe().system_to_component_index(A).first - dim;
+      if(ca>=0 && ca<n_diff_grains){
+	for(unsigned int B=0;B<dofs_per_cell;B++){
+	  int cb=fe_values.get_fe().system_to_component_index(B).first;
+	  if(cb>=0 && cb<dim){
+	    for(unsigned int I=0;I<dim;I++){
+	      for(unsigned int K=0;K<dim;K++){
+		for(unsigned int L=0;L<dim;L++){
+		  KLocal(A,B)+=fe_values.shape_value(A,q)*fe_values.shape_grad(B,q)[I]*C21[I][cb][K][L]*diffRotationMatrices[ca][K][L]*fe_values.JxW(q);
+		}
+	      }
+	    }
+	  }
+	}
+      }
+    }
+    
+    //jacobian matrix J22.... contribution
+
+    for(unsigned int A=0;A>dofs_per_cell;A++){
+      int ca=fe_values.get_fe().system_to_component_index(A).first - dim;
+      if(ca>=0 && ca<n_diff_grains){
+	for(unsigned int B=0;B<dofs_per_cell;B++){
+	  int cb=fe_values.get_fe().system_to_component_index(B).first - dim;
+	  if(cb>=0 && cb<n_diff_grains){
+	    for(unsigned int I=0;I<dim;I++){
+	      for(unsigned int J=0;J<dim;J++){
+		for(unsigned int K=0;K<dim;K++){
+		  for(unsigned int L=0;L<dim;L++){
+		    KLocal(A,B)-=fe_values.shape_value(A,q)*diffRotationMatrices[ca][I][J]*ElasticModulii[I][J][K][L]*diffRotationMatrices[cb][K][L]*fe_values.shape_value(B,q)*fe_values.JxW(q);
+		  }
+		}
+	      }
+	    }
+	  }
+	}
+      }
+    }
+    
     
   }
+  
+  
 }
 
 #endif /* MECHANICS_H_ */
