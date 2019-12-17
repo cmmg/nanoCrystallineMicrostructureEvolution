@@ -1,5 +1,5 @@
 multigrain model
-grain growth retarded
-diffusion model in solute
-interface thickness constant
-WA and WB changed to keep double well positive
+Cahn-Hilliard model in solute
+interface thickness kept constant
+code crashing at some point due to precippitation leading to negative double well W(x)=WA*(1-x)+WB*x
+
