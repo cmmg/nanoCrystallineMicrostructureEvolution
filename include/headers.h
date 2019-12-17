@@ -21,9 +21,6 @@ namespace LA
 #  error DEAL_II_WITH_PETSC or DEAL_II_WITH_TRILINOS required
 #endif
 }
-#include <deal.II/lac/lapack_full_matrix.h>
-#include <deal.II/lac/lapack_templates.h>
-#include <deal.II/lac/lapack_support.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/solver_cg.h>

@@ -24,7 +24,7 @@ namespace phaseField1
     std::vector<Point<dim> > *grainPoints;
     std::vector<unsigned int> *grainID;
     unsigned int n_seed_points;
-    InitalConditions (std::vector<Point<dim> >*_grainPoints, std::vector<unsigned int>*_grainID, unsigned int _n_seed_point): Function<dim>(TotalDOF),grainPoints(_grainPoints),grainID(_grainID),n_seed_points(_n_seed_point){}
+    InitalConditions (std::vector<Point<dim> >*_grainPoints, std::vector<unsigned int>*_grainID, unsigned int _n_seed_points): Function<dim>(TotalDOF),grainPoints(_grainPoints),grainID(_grainID),n_seed_points(_n_seed_points){}
    
     void vector_value (const Point<dim>   &p, Vector<double>   &values) const {
       Assert (values.size() == TotalDOF, ExcDimensionMismatch (values.size(),TotalDOF));
@@ -42,19 +42,20 @@ namespace phaseField1
       unsigned int g_id=(*grainID)[min];
       for(unsigned int i=0;i<n_diff_grains;i++){
 	if(i==g_id) {
-	  values(i)=0.99;
+	  values(i)=1.00;
 	  //values(dim+i)=0.99;
 	  
 	}
 	else{
-	  values(i)=0.01;
+	  values(i)=0.00;
 	}
       }
-      
+
+
       //if (std::sqrt(p.square())<0.1) {values(0)=0.99;}
       // values(1)=((double)(std::rand()%100))/100.;
-      values(n_diff_grains)=0.3+ ((double)(std::rand()%25)/1000.);//initial solute concentration
-      values(n_diff_grains+1)=0.0;//chemical potential
+      values(n_diff_grains)=0.09+ ((double)(std::rand()%25)/100.)*0.02;//initial solute concentration
+      //values(n_diff_grains+1)=0.0;//chemical potential
     }
   };
   
@@ -88,9 +89,10 @@ namespace phaseField1
     LA::MPI::Vector                           system_rhs;
     ConditionalOStream                        pcout;
     TimerOutput                               computing_timer;
+    unsigned int                              n_seed_points;
     std::vector<Point<dim> >                  grain_seeds;
     std::vector<unsigned int>                 grain_ID;
-    unsigned int                              n_seed_points;
+    double                                    interfaceEnergy;
     //solution variables
     unsigned int currentIncrement, currentIteration;
     double totalTime, currentTime, dt;
@@ -98,6 +100,7 @@ namespace phaseField1
     std::vector<std::string> nodal_solution_names; std::vector<DataComponentInterpretation::DataComponentInterpretation> nodal_data_component_interpretation;
     std::vector<std::string> nodal_solution_names_L2; std::vector<DataComponentInterpretation::DataComponentInterpretation> nodal_data_component_interpretation_L2;
     std::map<typename DoFHandler<dim>::active_cell_iterator, std::vector< historyVariables<dim>* > > history;
+    std::ofstream Energy;
   };
 
   template <int dim>
@@ -118,24 +121,28 @@ namespace phaseField1
     //nodal Solution names
     char buffer[100];
     for(unsigned int i=0;i<n_diff_grains;i++){
-      sprintf(buffer,"eta%u",i);
+      sprintf(buffer,"eta%u",i+1);
       nodal_solution_names.push_back(buffer); nodal_data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
     }
     
     nodal_solution_names.push_back("solute"); nodal_data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
-    nodal_solution_names.push_back("mu"); nodal_data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
+    //nodal_solution_names.push_back("mu"); nodal_data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
 
     char buffer1[100];
     for(unsigned int i=0;i<TotalDOF;i++){
       sprintf(buffer,"field%u",i);
       nodal_solution_names_L2.push_back(buffer); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
     }
+    if(Utilities::MPI::this_mpi_process(mpi_communicator)==0)
+    Energy.open("faceEnergy.txt");
 
   }
   
   template <int dim>
   phaseField<dim>::~phaseField () {
     dof_handler.clear ();
+ if(Utilities::MPI::this_mpi_process(mpi_communicator)==0)
+    Energy.close();
   }
 
   //Apply boundary conditions
@@ -156,14 +163,14 @@ namespace phaseField1
   template<int dim>
   void phaseField<dim>::grain_generation(){
     n_seed_points=N_seed_points;
-    double radii=problemWidth/(std::sqrt(n_seed_points));
+    double radii=1./std::sqrt(N_seed_points);
     pcout<<"radii"<<radii<<"\n";
     Point<dim> grain;
     std::srand(0.78);
     //srand (time(NULL));
-    grain[0]=((double)((std::rand())%100)/100)-0.5;
-    grain[1]=((double)((std::rand())%100)/100)-0.5;
-    
+    grain[0]=(double)(std::rand()%100)/100.-0.5;
+    grain[1]=(double)(std::rand()%100)/100.-0.5;
+    // grain[2]=(double)(std::rand()%100)/100.-0.5;
     grain_seeds.push_back(grain);
     
     for(unsigned int I=1;I<n_seed_points;I++){
@@ -174,8 +181,9 @@ namespace phaseField1
 	if(cntr==200000){cond=0; break;}
 	Table<1, double>distance(I);
 	for(unsigned int k=0;k<I;k++)distance[k]=0.;
-	grain[0]=((double)(std::rand()%100)/100)-0.5;
-	grain[1]=((double)(std::rand()%100)/100)-0.5;
+	grain[0]=(double)(std::rand()%100)/100.-0.5;
+	grain[1]=(double)(std::rand()%100)/100.-0.5;
+	//grain[2]=(double)(std::rand()%100)/100.-0.5;
 	for(unsigned int k=0;k<I;k++){
 	  distance[k]=grain.distance(grain_seeds[k]);
 	  if(distance[k]<radii)ctr++;
@@ -230,7 +238,7 @@ namespace phaseField1
     }*/
     
   }
-  
+ 
   
   //Setup
   template <int dim>
@@ -308,6 +316,7 @@ const QGauss<dim>  quadrature_formula(3);
     unsigned int n_q_points= fe_values.n_quadrature_points;
   
     typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(), endc = dof_handler.end();
+    Sacado::Fad::DFad<double> energy;
     for (; cell!=endc; ++cell)
       if (cell->is_locally_owned()){
 	fe_values.reinit (cell);
@@ -332,7 +341,7 @@ const QGauss<dim>  quadrature_formula(3);
 	for (unsigned int i=0; i<dofs_per_cell; ++i) {R[i]=0.0;}
 	
 	//populate residual vector 
-	residualForChemo(fe_values, 0, fe_face_values, cell, dt, ULocal, ULocalConv, R,/* currentTime, totalTime,*/ c_conv,local_matrix,currentIncrement,free_energy, currentIteration ,history[cell]);
+	residualForChemo(fe_values, 0, fe_face_values, cell, dt, ULocal, ULocalConv, R,/* currentTime, totalTime,*/ c_conv,local_matrix,currentIncrement,free_energy, currentIteration ,history[cell],energy);
 	
 	//evaluate Residual(R) and Jacobian(R')
 
@@ -348,6 +357,7 @@ const QGauss<dim>  quadrature_formula(3);
 
 	constraints.distribute_local_to_global (local_matrix, local_rhs, local_dof_indices, system_matrix, system_rhs);
       }
+    interfaceEnergy=energy.val();Utilities::MPI::sum(interfaceEnergy, mpi_communicator);
     system_matrix.compress (VectorOperation::add);
     system_rhs.compress (VectorOperation::add);
   }
@@ -405,51 +415,69 @@ const QGauss<dim>  quadrature_formula(3);
     
  }
 
-  
-  //Solve
   template <int dim>
   void phaseField<dim>::solveIteration(bool isProject){
     TimerOutput::Scope t(computing_timer, "solve");
     LA::MPI::Vector completely_distributed_solution (locally_owned_dofs, mpi_communicator);
-    /*    
-    //Iterative solvers from Petsc and Trilinos
-    SolverControl solver_control (dof_handler.n_dofs(), 1e-12);
+    
+    //check for convergence of iterative solver, and in case of slow convergence for smaller problem switch to Direct Solver.  
+    //try
+    {
+      //Iterative solvers from Petsc and Trilinos
+      SolverControl solver_control (dof_handler.n_dofs(), 1e-12);
 #ifdef USE_PETSC_LA
-    LA::SolverGMRES solver(solver_control, mpi_communicator);
+      LA::SolverGMRES solver(solver_control, mpi_communicator);
 #else
-    LA::SolverGMRES solver(solver_control);
+      LA::SolverGMRES solver(solver_control);
 #endif
-    LA::MPI::PreconditionAMG preconditioner;
-    LA::MPI::PreconditionAMG::AdditionalData data;
+      LA::MPI::PreconditionJacobi preconditioner;
+      LA::MPI::PreconditionJacobi::AdditionalData data;
 #ifdef USE_PETSC_LA
-    //data.symmetric_operator = true;
+      //data.symmetric_operator = true;
 #else
-    // Trilinos defaults are good 
+      // Trilinos defaults are good 
 #endif
-    preconditioner.initialize(system_matrix, data);
-    solver.solve (system_matrix, completely_distributed_solution, system_rhs, preconditioner);
-    pcout << "   Solved in " << solver_control.last_step()
-          << " iterations." << std::endl;
+      if(!isProject){
+	preconditioner.initialize(system_matrix, data);
+	solver.solve (system_matrix, completely_distributed_solution, system_rhs, preconditioner);
+	constraints.distribute (completely_distributed_solution);
+	locally_relevant_solution = completely_distributed_solution;
+	dU = completely_distributed_solution;
+      }
+      else{
+	preconditioner.initialize(mass_matrix, data);
+	solver.solve (mass_matrix, completely_distributed_solution, system_rhs, preconditioner);
+	constraints_L2.distribute(completely_distributed_solution);
+	locally_relevant_solution_L2=completely_distributed_solution;
+	U_L2=completely_distributed_solution;
+	UGhost_L2=U_L2;
+      }
+      pcout << "   Solved in " << solver_control.last_step()
+	    << " iterations." << std::endl;
+    }
+    /*
+    catch(...){
+      //Direct solver MUMPS
+      SolverControl cn;
+      PETScWrappers::SparseDirectMUMPS solver(cn, mpi_communicator);
+      if(!isProject){
+	solver.set_symmetric_mode(false);
+	solver.solve(system_matrix, completely_distributed_solution, system_rhs);
+	constraints.distribute (completely_distributed_solution);
+	locally_relevant_solution = completely_distributed_solution;
+	dU = completely_distributed_solution;
+      }
+      else{
+	solver.set_symmetric_mode(true);
+	solver.solve(mass_matrix, completely_distributed_solution, system_rhs);
+	constraints_L2.distribute(completely_distributed_solution);
+	locally_relevant_solution_L2=completely_distributed_solution;
+	U_L2=completely_distributed_solution;
+	UGhost_L2=U_L2;
+      }
     */
-    //Direct solver MUMPS
-    SolverControl cn;
-    PETScWrappers::SparseDirectMUMPS solver(cn, mpi_communicator);
-    if(!isProject){
-      solver.set_symmetric_mode(false);
-      solver.solve(system_matrix, completely_distributed_solution, system_rhs);
-      constraints.distribute (completely_distributed_solution);
-      locally_relevant_solution = completely_distributed_solution;
-      dU = completely_distributed_solution;
-    }
-    else{
-      solver.set_symmetric_mode(true);
-      solver.solve(mass_matrix, completely_distributed_solution, system_rhs);
-      constraints_L2.distribute(completely_distributed_solution);
-      locally_relevant_solution_L2=completely_distributed_solution;
-      U_L2=completely_distributed_solution;
-      UGhost_L2=U_L2;
-    }
   }
+
 
   //Solve
   template <int dim>
@@ -472,6 +500,9 @@ const QGauss<dim>  quadrature_formula(3);
       ++currentIteration;
     }
     Un=U; UnGhost=Un;
+    if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0){
+      Energy << currentIncrement << "\t" << interfaceEnergy << "\n" << std::flush;
+    }
   }
 
   //Output
@@ -530,7 +561,7 @@ const QGauss<dim>  quadrature_formula(3);
 	  << std::endl;
     
     //setup initial conditions
-    VectorTools::interpolate(dof_handler, InitalConditions<dim>(&grain_seeds, &grain_ID, n_seed_points), U); Un=U;
+    VectorTools::interpolate(dof_handler, InitalConditions<dim>(&grain_seeds, &grain_ID,n_seed_points), U); Un=U;
     
     //sync ghost vectors to non-ghost vectors
     UGhost=U;  UnGhost=Un;
@@ -542,7 +573,9 @@ const QGauss<dim>  quadrature_formula(3);
       currentIncrement++;
       solve();
       L2_projection();
-      output_results(currentIncrement);
+      if(currentIncrement<200 || (currentIncrement%100==0)){
+	output_results(currentIncrement);
+      }
       pcout << std::endl;
     }
    
@@ -557,7 +590,7 @@ int main(int argc, char *argv[]){
       using namespace dealii;
       using namespace phaseField1;
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
-      phaseField<2> problem;
+      phaseField<DIMS> problem;
       //fstream myfile;
       problem.run ();
     }
