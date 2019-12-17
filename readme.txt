@@ -1,5 +1,3 @@
-multigrain model
-Cahn-Hilliard model in solute
-interface thickness kept constant
-code crashing at some point due to precippitation leading to negative double well W(x)=WA*(1-x)+WB*x
-
+grain growth model coupled with orthotropic hyperelastic model
+strain has a grain dependent rotation part
+no mesh deformation -dependent on grain
