@@ -14,26 +14,32 @@ template <int dim>
 struct historyVariables{
 public:
   historyVariables<dim>():
-  alpha(0.0), beta (dim+1), betaIteration(dim+1), Ep(dim+1), EpIteration(dim+1), stress(0) ,elasStrain12(0.0){}
+  alpha(0.0), beta (dim+1), betaIteration(dim+1), Ep(dim+1), EpIteration(dim+1), stress(0.0), orientation(0.0) ,elasStrain12(0.0){}
 
   //using std:::map to store time history variables
   double alpha, alphaIteration;
   double eqvStress, equvStrain;
   double elasStrain11, elasStrain12;
   dealii::Table<1, double > beta, betaIteration;
-  double stress;
+  double stress, orientation;
   dealii::Table<1, double > Ep, EpIteration;
 };
 
 template<int dim>
 void assign_grain_id(Table<1, double>& angle,unsigned int & currentIncrement){
   std::srand(5.55);
-  //  for(unsigned int i=0;i<n_diff_grains;i++){
-    //angle[i]=(double)(std::rand()%180);
-    //    if(i%2) angle[i]=90.0;
-    //else angle[i]=0.0;
-  angle[0]=0.0; angle[1]=45.0;
-    //}
+  for(unsigned int i=0;i<n_diff_grains;i++){
+    if(i<4)angle[i]=90.0;
+    else angle[i]=0.0;
+  }
+
+  //for(unsigned int i=0;i<n_diff_grains;i++){
+      //angle[i]=(double)(std::rand()%180);
+  //  if(i%3==0) angle[i]=0.0;
+  //  if(i%3==1) angle[i]=45.0;
+  //  if(i%3==2) angle[i]=90.0;
+  // }
+    //angle[0]=0.0; angle[1]=30.0; angle[2]=60.0; angle[3]=90.0; angle[4]=0.0; angle[5]=30.0; angle[6]=60.0; angle[7]=90.0;
   //if(currentIncrement<10)angle[0]=0.0;
   //else{
   //angle[0]=(((double)(currentIncrement)-10)/100.0)*90.0; 
@@ -88,7 +94,7 @@ void computeRotatedModulii(Table<4, double>&ElasticModulus, std::vector<FullMatr
 
 //mechanics implementation
 template <class T, int dim>
-  void evaluateStress(unsigned int q, FEValues<dim>& fe_values, const unsigned int DOF, const Table<1, T>& ULocal,const Table<1, T>& ULocalConv, const deformationMap<T, dim>& defMap, unsigned int currentIteration,  std::vector<historyVariables<dim>*>& history,Table<1, double>&grainAngle,Table<1, double>&phi, Table<2, double>& stress, FullMatrix<double>& C_consistent,Table<4, double>&ElasticModulus ,Table<4, double>&ElasticTangentModulus, Table<2, double>& strain,FullMatrix<double>&Rotation,Table<2, double>&defGrad, double fractionalTime, double & freeEnergyMech,std::vector<double>& dF, std::vector<double>& dE, std::vector<double>& dF_dE, unsigned int & currentIncrement,Table<1, double>&h_phi, std::vector<Table<4, double> >&A_phi){ 
+  void evaluateStress(unsigned int q, FEValues<dim>& fe_values, const unsigned int DOF, const Table<1, T>& ULocal,const Table<1, T>& ULocalConv, const deformationMap<T, dim>& defMap, unsigned int currentIteration,  std::vector<historyVariables<dim>*>& history,Table<1, double>&grainAngle,Table<1, double>&phi, Table<2, double>& stress, FullMatrix<double>& C_consistent,Table<4, double>&ElasticModulus ,Table<4, double>&ElasticTangentModulus, Table<2, double>& strain,FullMatrix<double>&Rotation,Table<2, double>&defGrad, double fractionalTime, double & freeEnergyMech, unsigned int & currentIncrement,Table<1, double>&h_phi, std::vector<Table<4, double> >&A_phi){ 
 
 
   unsigned int dofs_per_cell= fe_values.dofs_per_cell;
@@ -120,7 +126,10 @@ template <class T, int dim>
 
   assign_grain_id<dim>(grainAngle,currentIncrement);
   crystalRotation<dim>(phi, grainAngle, rotationMatrices);
-  
+  history[q]->orientation=0.0;
+  for(unsigned int i=0;i<n_diff_grains;i++){
+    history[q]->orientation+=phi[i]*grainAngle[i];
+  }
   //material properties
   Table<2,double> Fe (dim, dim);
   Table<2,double> E (dim, dim);
@@ -177,28 +186,8 @@ template <class T, int dim>
 	  freeEnergyMech+=(0.5)*(E[i][j]*ElasticTangentModulus[i][j][k][l]*E[k][l])*fe_values.JxW(q);
 	  
 	}
-
-  // calclate derivatives of energies
-
-  double phiSum=0.0; //double dF=0.0; double dE=0.0;
-  for(unsigned int i=0;i<n_diff_grains;i++)phiSum+=phi[i]*phi[i];
-  for(unsigned int i=0;i<n_diff_grains;i++){
-    dF[i]+=(4./3.)*(-12.0*phi[i]*phi[i]+ 12 *phi[i]*phiSum)*fe_values.JxW(q);
-  }
-  for(unsigned int N=0;N<n_diff_grains;N++){
-    for(unsigned int i=0;i<dim;i++){
-      for(unsigned int j=0;j<dim;j++){
-	for(unsigned int k=0;k<dim;k++){
-	  for(unsigned int l=0;l<dim;l++){
-	    dE[N]+=0.5*(sin(PI*phi[N])/h_total)*(PI/2.0)*(A_phi[N][i][j][k][k]-ElasticTangentModulus[i][j][k][l]/h_total)*E[i][j]*E[k][l]*fe_values.JxW(q);
-	  }
-	}
-      }
-    }
-  }
   
-  for(unsigned int i=0;i<n_diff_grains;i++)dF_dE[i]=dF[i]-dE[i];
-
+  
   for(int i=0;i<dim;i++) for(int j=0;j<dim;j++) stress[i][j]=0.;
 
   for(unsigned int i=0;i<dim;i++) for(unsigned int j=0;j<dim;j++) for(unsigned int k=0;k<dim;k++) for(unsigned int l=0;l<dim;l++){stress[i][j]+=ElasticTangentModulus[i][j][k][l]*E[k][l];}
@@ -210,6 +199,7 @@ template <class T, int dim>
   history[q]->elasStrain11=stress[0][0];
   history[q]->elasStrain12=gamma;*/
   history[q]->stress=stress[0][0];
+  
 }
 
 template<int dim>
@@ -223,7 +213,7 @@ void calculate_diff_rotation(int I, FullMatrix<double>& diffRotation,double frac
 
 //mechanics residual implementation
 template <int dim>
-void residualForMechanics(FEValues<dim>& fe_values,FEFaceValues<dim> & fe_face_values,const typename DoFHandler<dim>::active_cell_iterator & cell, unsigned int DOF, Table<1, double >& ULocal, Table<1, double>& ULocalConv, deformationMap<double, dim>& defMap, unsigned int currentIteration,  std::vector<historyVariables<dim>* >& history, Vector<double>& RLocal, FullMatrix<double>& KLocal, double fractionalTime, double & freeEnergyMech, std::vector<double>& dF, std::vector<double>&dE, std::vector<double>& dF_dE ,unsigned int & currentIncrement){
+void residualForMechanics(FEValues<dim>& fe_values,FEFaceValues<dim> & fe_face_values,const typename DoFHandler<dim>::active_cell_iterator & cell, unsigned int DOF, Table<1, double >& ULocal, Table<1, double>& ULocalConv, deformationMap<double, dim>& defMap, unsigned int currentIteration,  std::vector<historyVariables<dim>* >& history, Vector<double>& RLocal, FullMatrix<double>& KLocal, double fractionalTime, double & freeEnergyMech, unsigned int & currentIncrement){
   unsigned int dofs_per_cell= fe_values.dofs_per_cell;
   unsigned int n_q_points= fe_values.n_quadrature_points;
   unsigned int n_face_q_points=fe_face_values.n_quadrature_points;
@@ -231,31 +221,8 @@ void residualForMechanics(FEValues<dim>& fe_values,FEFaceValues<dim> & fe_face_v
   Table<1, double> traction(dim);
   traction[0]=100.0; traction[1]=0.0;
   
-  //surface boundary condition
-  //if(currentIncrement>=3 && currentIncrement<=9){
-  /*for(unsigned int faceID=0;faceID<2*dim;faceID++){
-    if(cell->face(faceID)->at_boundary()){
-      //std::cout<<"control here1";
-      if((std::abs(cell->face(faceID)->center()[0]-0.5)<1e-8)){
-	//std::cout<<"control here2";
-	fe_face_values.reinit(cell,faceID);
-	for(unsigned int I=0;I<dofs_per_cell;I++){
-	  unsigned int ci=fe_values.get_fe().system_to_component_index(I).first;
-	  if(ci>=0 && ci<dim){
-	    for(unsigned int q=0;q<n_face_q_points;q++){
-	      //std:: cout<<"control here3"; 
-	      double var=0;
-	      var=fe_face_values.shape_value(I,q)*traction[ci]*fe_face_values.JxW(q);
-	      RLocal[I]+=var;
-	      //RLocal[I]+=fe_face_values.shape_value(I,q)*traction[ci]*fe_face_values.JxW(q);		
-	      //if(var>1e-6){std::cout<<"ho gya bhai\t"<<var<<" "; exit(-1);}
-	    }
-	  }
-	}
-      }
-    }
-  }*/
-    //}*/
+  
+	      
 
   for (unsigned int q=0; q<n_q_points; q++){
     Table<1, double>phi(n_diff_grains), grainAngle(n_diff_grains);
@@ -271,7 +238,7 @@ void residualForMechanics(FEValues<dim>& fe_values,FEFaceValues<dim> & fe_face_v
     for(unsigned int i=0;i<dim;i++)for(unsigned int j=0;j<dim;j++)for(unsigned int k=0;k<dim;k++)for(unsigned int l=0;l<dim;l++)ElasticModulus[i][j][k][l]=0.;
     Table<2, double>defGrad(dim, dim);
     
-    evaluateStress<double, dim>(q,fe_values, DOF, ULocal, ULocalConv, defMap, currentIteration, history, grainAngle, phi,stress, C, ElasticModulus,ElasticTangentModulus,strain,Rotation,defGrad, fractionalTime, freeEnergyMech, dF, dE, dF_dE,currentIncrement,h_phi, A_phi);
+    evaluateStress<double, dim>(q,fe_values, DOF, ULocal, ULocalConv, defMap, currentIteration, history, grainAngle, phi,stress, C, ElasticModulus,ElasticTangentModulus,strain,Rotation,defGrad, fractionalTime, freeEnergyMech, currentIncrement,h_phi, A_phi);
     double h_total=0.;
     for(unsigned int N=0;N<n_diff_grains;N++)h_total+=h_phi[N];
    
@@ -306,7 +273,7 @@ void residualForMechanics(FEValues<dim>& fe_values,FEFaceValues<dim> & fe_face_v
 	  for(unsigned int j=0;j<dim;j++){
 	    for(unsigned int k=0;k<dim;k++){
 	      for(unsigned int l=0;l<dim;l++){
-		RLocal(I)+=Mobility_m*0.5*fe_values.shape_value(I,q)*strain[i][j]*tempModulus[i][j][k][l]*strain[k][l]*fe_values.JxW(q);
+		RLocal(I)+=Mobility*0.5*fe_values.shape_value(I,q)*strain[i][j]*tempModulus[i][j][k][l]*strain[k][l]*fe_values.JxW(q);
 	      }
 	    }
 	  }
@@ -393,7 +360,7 @@ void residualForMechanics(FEValues<dim>& fe_values,FEFaceValues<dim> & fe_face_v
 	      int cb=fe_values.get_fe().system_to_component_index(B).first;
 	      if(cb>=0 && cb<dim){
 		for(unsigned int j=0;j<dim;j++){
-		  KLocal(A,B)+=Mobility_m*fe_values.shape_grad(B,q)[j]*tempModulus[cb][j][k][l]*strain[k][l]*fe_values.shape_value(A,q)*fe_values.JxW(q);
+		  KLocal(A,B)+=Mobility*fe_values.shape_grad(B,q)[j]*tempModulus[cb][j][k][l]*strain[k][l]*fe_values.shape_value(A,q)*fe_values.JxW(q);
 		}
 	      }
 	    }
@@ -443,7 +410,7 @@ void residualForMechanics(FEValues<dim>& fe_values,FEFaceValues<dim> & fe_face_v
 	      for(unsigned int j=0;j<dim;j++){
 		for(unsigned int k=0;k<dim;k++){
 		  for(unsigned int l=0;l<dim;l++){
-		    KLocal(A,B)+=Mobility_m*0.5*fe_values.shape_value(A,q)*strain[i][j]*tempModulus[i][j][k][l]*strain[k][l]*fe_values.shape_value(B,q)*fe_values.JxW(q);
+		    KLocal(A,B)+=Mobility*0.5*fe_values.shape_value(A,q)*strain[i][j]*tempModulus[i][j][k][l]*strain[k][l]*fe_values.shape_value(B,q)*fe_values.JxW(q);
 		  }
 		}
 	      }

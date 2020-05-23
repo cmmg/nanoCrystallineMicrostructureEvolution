@@ -1,1 +1,1 @@
-using Tonk's model, 2 grains parallel to Y axis, tested for dirichlet boundary condition.
+domain divided into multigrains keeping 50-50 ratio of 2 orientations , to check multigrain coupling with elasticity working.

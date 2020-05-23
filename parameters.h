@@ -9,16 +9,14 @@
 
 //time step controls
 #define TimeStep 1.0e-2
-#define TotalTime 1000*TimeStep
-#define N_seed_points 2
-#define n_diff_grains 2
+#define TotalTime 5000*TimeStep
+#define N_seed_points 64
+#define n_diff_grains 8
 //#define yield_stress 1.0
 #define kappa1 5.0e-4
 #define Vm 1.0
 #define InterfaceEnergyParameter 5.0e-4
-#define Mobility 50.0//10.0//10.0// 10.0//50.0
-#define Mobility_c 50.0
-#define Mobility_m 50.0
+#define Mobility 25.0//10.0//10.0// 10.0//50.0
 #define M_alpha 0.0//0.1//0.1
 #define lambda1 0.00//1.0e-2
 #define n_solute 1
@@ -26,6 +24,6 @@
 #define TotalDOF DIMS+n_diff_grains//+n_solute+n_chemical_potential
 //output controls
 #define outputFileName "solution"
-#define alpha1 2000
-#define beta1 1000
+#define alpha1 10000
+#define beta1 5000
 #define PI 3.14159265359
