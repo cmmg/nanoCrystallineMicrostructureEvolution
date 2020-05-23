@@ -90,7 +90,6 @@ namespace elasticity1
     double                                    freeEnergyChemBulk, freeEnergyChemGB, freeEnergyMech;
     //std::vector<double>                       freeEnergyMech;
     //solution variables
-    std::vector<double>                       grainOrientation;
     unsigned int currentIncrement, currentIteration;
     double totalTime, currentTime, dt;
     std::vector<std::string> nodal_solution_names; std::vector<DataComponentInterpretation::DataComponentInterpretation> nodal_data_component_interpretation;
@@ -187,7 +186,7 @@ namespace elasticity1
       VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.00, TotalDOF), constraints, uBCX1);
     }
     if(currentIncrement>=3 && currentIncrement<=9){
-      VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.003, TotalDOF), constraints, uBCX1);
+      VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.002, TotalDOF), constraints, uBCX1);
     }
    
     if(currentIncrement>9){
@@ -222,7 +221,7 @@ namespace elasticity1
     Point<dim> grain;
     std::srand(0.78);
     //srand (time(NULL));
-    /*grain[0]=(double)(std::rand()%100)/100.-0.50;
+    grain[0]=(double)(std::rand()%100)/100.-0.50;
     grain[1]=(double)(std::rand()%100)/100.-0.5;
     grain_seeds.push_back(grain);
     
@@ -245,31 +244,8 @@ namespace elasticity1
       if(cond==0){n_seed_points=I;break;}
       grain_seeds.push_back(grain);
       //for loop ends for generating points
-    }*/
-    
-    Table<1, double> xAxis(8); Table<1, double> yAxis(8);
-    for(unsigned int i=0;i<7;i++){xAxis[i]=0.0; yAxis[i]=0.0;}
-    xAxis[0]=-0.5 + (1.0/16.0); yAxis[0]=-0.5+ (1.0/16.0);
-    for(unsigned int i=1; i<8; i++){
-      xAxis[i]=xAxis[i-1]+(1.0/8.0); yAxis[i]=yAxis[i-1]+(1.0/8.0);
-    }
-    for(unsigned int i=0;i<8;i++){
-      for(unsigned int j=0;j<8;j++){
-	Point<dim> grain;
-	grain[0]=xAxis[i]; grain[1]=yAxis[j];
-	grain_seeds.push_back(grain);
-      }
     }
     
-    for(unsigned int i=0;i<8;i++){int var=(i)%4;grain_ID.push_back(var);}
-    for(unsigned int i=8;i<16;i++){int var=((i-8+2)%4);grain_ID.push_back(var);}
-    for(unsigned int i=16;i<24;i++){int var=((i-16)%4); grain_ID.push_back(var);}
-    for(unsigned int i=24;i<32;i++){int var=((i-24+2)%4); grain_ID.push_back(var);}
-    for(unsigned int i=32;i<40;i++){int var=((i-32)%4)+4; grain_ID.push_back(var);}
-    for(unsigned int i=40;i<48;i++){int var=((i-40+2)%4)+4; grain_ID.push_back(var);}
-    for(unsigned int i=48;i<56;i++){int var=((i-48)%4)+4; grain_ID.push_back(var);}
-    for(unsigned int i=56;i<64;i++){int var=((i-56+2)%4)+4; grain_ID.push_back(var);}
-
     double min=0.;
     min=grain_seeds[0].distance(grain_seeds[1]);
 
@@ -281,7 +257,7 @@ namespace elasticity1
 
     //std::cout<<"number of seed points"<<n_seed_points<<"minimum distance="<<min;
     //assign grain_ID to each seed point
-    /*for(unsigned int i=0;i<n_seed_points;i++){
+    for(unsigned int i=0;i<n_seed_points;i++){
       if(i<n_diff_grains)grain_ID.push_back(i);
       else{
 	Table<1, double> distance(i),temp_d(i);unsigned int var,findid_j, findid_k;
@@ -306,7 +282,7 @@ namespace elasticity1
 	}
 	//else ends
       }
-    }*/
+    }
 
  
     

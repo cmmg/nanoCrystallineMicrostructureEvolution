@@ -1,1 +1,1 @@
-domain divided into multigrains keeping 50-50 ratio of 2 orientations , to check multigrain coupling with elasticity working.
+multi grain problem with randomly allocated grains with eith 0 or 90 orientation, preferring one orientation- tested.

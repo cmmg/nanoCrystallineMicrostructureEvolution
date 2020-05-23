@@ -29,17 +29,13 @@ template<int dim>
 void assign_grain_id(Table<1, double>& angle,unsigned int & currentIncrement){
   std::srand(5.55);
   for(unsigned int i=0;i<n_diff_grains;i++){
-    if(i<4)angle[i]=90.0;
+    //angle[i]=(double)(std::rand()%180);
+    //if(i%2) angle[i]=0.0;
+    //else angle[i]=30.0;
+    if(i%2) angle[i]=90.0;
     else angle[i]=0.0;
   }
-
-  //for(unsigned int i=0;i<n_diff_grains;i++){
-      //angle[i]=(double)(std::rand()%180);
-  //  if(i%3==0) angle[i]=0.0;
-  //  if(i%3==1) angle[i]=45.0;
-  //  if(i%3==2) angle[i]=90.0;
-  // }
-    //angle[0]=0.0; angle[1]=30.0; angle[2]=60.0; angle[3]=90.0; angle[4]=0.0; angle[5]=30.0; angle[6]=60.0; angle[7]=90.0;
+  //  angle[0]=0.0; angle[1]=30.0; angle[2]=60.0; angle[3]=90.0; angle[4]=0.0; angle[5]=30.0; angle[6]=60.0; angle[7]=90.0;
   //if(currentIncrement<10)angle[0]=0.0;
   //else{
   //angle[0]=(((double)(currentIncrement)-10)/100.0)*90.0; 
