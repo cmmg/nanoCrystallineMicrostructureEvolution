@@ -1,36 +1,31 @@
 //problem geometry, mesh control
-#define DIMS 3
-//#define problemWidth 10
-#define problemWidth 10.0
-#define problemHeight 100.0
-#define NumMeshPoints 2
-#define refinementFactor 0
-
+#define DIMS 2
+#define problemWidth 1.0
+#define refinementFactor 7
 
 //mechanics properties
-#define elasticModulus 4//2.0e11
+#define elasticModulus 20//2.0e11
 #define PoissonsRatio 0.3
-#define TimeStep 0.01
-//time step controls
-#define TotalTime 1000*TimeStep
 
+//time step controls
+#define TimeStep 1.0e-2
+#define TotalTime 1000*TimeStep
+#define N_seed_points 2
+#define n_diff_grains 2
+//#define yield_stress 1.0
+#define kappa1 5.0e-4
+#define Vm 1.0
+#define InterfaceEnergyParameter 5.0e-4
+#define Mobility 50.0//10.0//10.0// 10.0//50.0
+#define Mobility_c 50.0
+#define Mobility_m 50.0
+#define M_alpha 0.0//0.1//0.1
+#define lambda1 0.00//1.0e-2
+#define n_solute 1
+#define n_chemical_potential 1
+#define TotalDOF DIMS+n_diff_grains//+n_solute+n_chemical_potential
 //output controls
 #define outputFileName "solution"
-
-
-//#define Yield_stress 0.1
-#define n_slip_systems 1
-#define PI 3.14159265
-#define self_hardening  0.0180
-#define Ss 0.0148
-#define N_seed_points 4
-#define n_diff_grains 4
-#define totalDOF n_diff_grains+DIMS
-#define InterfaceEnergyParameter {1.0e-3, 1.0e-3, 1.0e-3} //{Kx, Ky, Kz}
-//#define InterfaceEnergyParameter {2, 2, 2} //{Kx, Ky, Kz}
-#define L1 0.0
-#define alpha1 1
-#define beta1 1
-#define gamma1 1
-#define lambda1 1.0e-5
-
+#define alpha1 2000
+#define beta1 1000
+#define PI 3.14159265359
