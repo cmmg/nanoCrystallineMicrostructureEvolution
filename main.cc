@@ -27,8 +27,25 @@ namespace elasticity1
     
     void vector_value (const Point<dim>   &p, Vector<double>   &values) const {
       Assert (values.size() == TotalDOF, ExcDimensionMismatch (values.size(),TotalDOF));
-      values(0)=0.; values(1)=0.;
-     
+      //values(0)=0.; values(1)=0.; values(2)=0.0;
+      for(unsigned int i=0;i<dim;i++){
+	values(i)=0.0;
+      }
+      /*for(unsigned int i=0;i<n_diff_grains;i++){
+	if(p[0]<0){values(dim+i)=1.0;}
+	else values(dim+i)=0.0;
+	}*/
+      //if(p[0]<0.00){values(3)=1.0; values(4)=0.0;}
+      //else{values(3)=0.0; values(4)=1.0; }
+      //if(p[0]<0.0){values(2)=1.00; values(3)=0.0;}
+      //else{values(2)=0.0; values(3)=1.0;}
+      //values(3)=1.0; values(4)=0.0;
+      //if(p[0]<0.0 && p[1]>0.0){values(2)=0.99; values(3)=0.01;}
+      //if(p[0]>0.0 && p[1]>0.0){values(2)=0.01; values(3)=0.99;}
+      //if(p[0]<0.0 && p[1]<0.0){values(2)=0.01; values(3)=0.99;}
+      //if(p[0]>0.0 && p[1]<0.0){values(2)=0.99; values(3)=0.01;}
+      
+
       Table<1, double>distance(n_seed_points);
       for(unsigned int i=0;i<n_seed_points;i++){
 	distance[i]=p.distance((*grainPoints)[i]);
@@ -88,7 +105,7 @@ namespace elasticity1
     std::vector<unsigned int>                 grain_ID;
     unsigned int                              n_seed_points;
     double                                    freeEnergyChemBulk, freeEnergyChemGB, freeEnergyMech;
-    //std::vector<double>                       freeEnergyMech;
+    std::vector<double>                       dF, dE, dF_dE;
     //solution variables
     unsigned int currentIncrement, currentIteration;
     double totalTime, currentTime, dt;
@@ -132,16 +149,20 @@ namespace elasticity1
 
       nodal_solution_names_L2.push_back("stress"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
       nodal_solution_names_L2.push_back("Ep132"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
-      nodal_solution_names_L2.push_back("orientation"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
-      nodal_solution_names_L2.push_back("Ep231"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
-      nodal_solution_names_L2.push_back("Ep312"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
-      nodal_solution_names_L2.push_back("Ep321"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
-      nodal_solution_names_L2.push_back("Ep11"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
-      nodal_solution_names_L2.push_back("Ep22"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
-      nodal_solution_names_L2.push_back("Ep221"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
-      nodal_solution_names_L2.push_back("Ep222"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
-      nodal_solution_names_L2.push_back("Ep2200"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
-      nodal_solution_names_L2.push_back("Ep220"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
+      if(dim==3){
+	nodal_solution_names_L2.push_back("Ep213"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
+      }
+      for(unsigned int i=0;i<n_diff_grains;i++){
+	sprintf(buffer, "EP%u",i);
+	nodal_solution_names_L2.push_back(buffer); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
+      }
+      //nodal_solution_names_L2.push_back("Ep321"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
+      //nodal_solution_names_L2.push_back("Ep11"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
+      //nodal_solution_names_L2.push_back("Ep22"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
+      //nodal_solution_names_L2.push_back("Ep221"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
+      //nodal_solution_names_L2.push_back("Ep222"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
+	/*nodal_solution_names_L2.push_back("Ep2200"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);
+	nodal_solution_names_L2.push_back("Ep220"); nodal_data_component_interpretation_L2.push_back(DataComponentInterpretation::component_is_scalar);*/
       if(Utilities::MPI::this_mpi_process(mpi_communicator)==0)
 	energy.open("Energy.txt");
   }
@@ -180,18 +201,25 @@ namespace elasticity1
     std::vector<bool> uBCY0 (TotalDOF, false); uBCY0[1]=true; 
     VectorTools::interpolate_boundary_values (dof_handler, 2, ZeroFunction<dim>(TotalDOF), constraints, uBCY0);
     VectorTools::interpolate_boundary_values (dof_handler, 2, ZeroFunction<dim>(TotalDOF), constraints2, uBCY0);
-    std::vector<bool> uBCX1 (TotalDOF, false); uBCX1[0]=true;
+    //std::vector<bool> uBCX1 (TotalDOF, false); uBCX1[0]=true;
     // VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.00, TotalDOF), constraints, uBCX1);
-    if(currentIncrement<3){
-      VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.00, TotalDOF), constraints, uBCX1);
+    if (dim==3) {
+      std::vector<bool> uBCZ0 (TotalDOF, false); uBCZ0[2]=true;
+      VectorTools::interpolate_boundary_values (dof_handler, 4, ZeroFunction<dim>(TotalDOF), constraints, uBCZ0);
+      VectorTools::interpolate_boundary_values (dof_handler, 4, ZeroFunction<dim>(TotalDOF), constraints2, uBCZ0);
     }
-    if(currentIncrement>=3 && currentIncrement<=9){
+    
+    std::vector<bool> uBCX1 (TotalDOF, false); uBCX1[0]=true;
+    if(currentIncrement>3 && currentIncrement<=9){
       VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.002, TotalDOF), constraints, uBCX1);
     }
-   
-    if(currentIncrement>9){
+    else{
       VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.00, TotalDOF), constraints, uBCX1);
     }
+   
+    /*if(currentIncrement>8){
+      VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.01, TotalDOF), constraints, uBCX1);
+    }*/
     VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(TotalDOF), constraints2, uBCX1);
 
     //for pure shear
@@ -223,6 +251,9 @@ namespace elasticity1
     //srand (time(NULL));
     grain[0]=(double)(std::rand()%100)/100.-0.50;
     grain[1]=(double)(std::rand()%100)/100.-0.5;
+    if(dim==3){
+      grain[2]=(double)(std::rand()%100)/100.-0.5;
+    }
     grain_seeds.push_back(grain);
     
     for(unsigned int I=1;I<n_seed_points;I++){
@@ -235,6 +266,9 @@ namespace elasticity1
 	for(unsigned int k=0;k<I;k++)distance[k]=0.;
 	grain[0]=((double)(std::rand()%100)/100.0)-0.50;
 	grain[1]=((double)(std::rand()%100)/100.0)-0.50;
+	if(dim==3){
+	  grain[2]=((double)(std::rand()%100)/100.0)-0.50;
+	}
 	for(unsigned int k=0;k<I;k++){
 	  distance[k]=grain.distance(grain_seeds[k]);
 	  if(distance[k]<radii)ctr++;
@@ -366,7 +400,12 @@ namespace elasticity1
     std::vector<unsigned int> local_dof_indices (dofs_per_cell);
     unsigned int n_q_points= fe_values.n_quadrature_points;
     freeEnergyChemBulk=0.;  freeEnergyChemGB=0.; freeEnergyMech=0.0;
-    //for(unsigned int I=0;I<n_diff_grains;I++)freeEnergyMech.push_back(0.0);
+    dF.resize(0);dE.resize(0);dF_dE.resize(0);
+    for(unsigned int I=0;I<n_diff_grains;I++){
+      dF.push_back(0.0);
+      dE.push_back(0.0);
+      dF_dE.push_back(0.0);
+    }
     typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(), endc = dof_handler.end();
     for (; cell!=endc; ++cell)
       if (cell->is_locally_owned()){
@@ -385,7 +424,7 @@ namespace elasticity1
 
 	double fractionalTime=1.0;
 
-        residualForMechanics<dim>(fe_values,fe_face_values,cell, 0, ULocal, ULocalConv, defMap, currentIteration, history[cell], local_rhs, local_matrix, fractionalTime,freeEnergyMech,currentIncrement);
+        residualForMechanics<dim>(fe_values,fe_face_values,cell, 0, ULocal, ULocalConv, defMap, currentIteration, history[cell], local_rhs, local_matrix, fractionalTime,freeEnergyMech, dF, dE, dF_dE, currentIncrement);
 	//if(currentIncrement<=10){
 	residualForChemo<dim>( fe_values, dim,  fe_face_values,cell, dt, ULocal, ULocalConv, local_rhs, local_matrix, currentIncrement, currentIteration , history[cell],freeEnergyChemBulk, freeEnergyChemGB);
 	  //}
@@ -406,7 +445,11 @@ namespace elasticity1
     freeEnergyChemBulk=Utilities::MPI::sum(freeEnergyChemBulk,mpi_communicator);
     freeEnergyChemGB=Utilities::MPI::sum(freeEnergyChemGB,mpi_communicator);
     freeEnergyMech=Utilities::MPI::sum(freeEnergyMech, mpi_communicator);
-    
+    for(unsigned int i=0;i<n_diff_grains;i++){
+      dF[i]=Utilities::MPI::sum(dF[i], mpi_communicator);
+      dE[i]=Utilities::MPI::sum(dE[i], mpi_communicator);
+      dF_dE[i]=Utilities::MPI::sum(dF_dE[i], mpi_communicator);
+    }
     system_matrix.compress (VectorOperation::add);
     system_rhs.compress (VectorOperation::add);
   }
@@ -443,9 +486,6 @@ namespace elasticity1
 	    else if (ci==1){
 	      local_rhs(i)+= fe_values.shape_value(i,q)*history[cell][q]->elasStrain12*fe_values.JxW(q);
 	    }
-	    else if(ci==2){
-	      local_rhs(i)+=fe_values.shape_value(i,q)*(history[cell][q]->orientation)*fe_values.JxW(q);
-	    }
 	    for(unsigned int j=0;j<dofs_per_cell;j++){
 	      const unsigned int cj = fe_values.get_fe().system_to_component_index(j).first;
 	      if (ci==cj){
@@ -474,7 +514,7 @@ namespace elasticity1
       
     //check for convergence of iterative solver, and in case of slow convergence for smaller problem switch to Direct Solver.  
     //try
-    /*{
+    {
       //Iterative solvers from Petsc and Trilinos
       SolverControl solver_control (dof_handler.n_dofs(), 1e-12);
 #ifdef USE_PETSC_LA
@@ -516,11 +556,11 @@ namespace elasticity1
 	U_L2=completely_distributed_solution;
 	UGhost_L2=U_L2;
       }
-     }*/
+     }
     
     //catch(...){
       //Direct solver MUMPS
-    SolverControl cn;
+    /*SolverControl cn;
       PETScWrappers::SparseDirectMUMPS solver(cn, mpi_communicator);
       if(!isProject){
 	solver.set_symmetric_mode(false);
@@ -542,9 +582,9 @@ namespace elasticity1
 	locally_relevant_solution_L2=completely_distributed_solution;
 	U_L2=completely_distributed_solution;
 	UGhost_L2=U_L2;
-      }
+      }*/
     
-  }
+ }
 
   //Solve
   template <int dim>
@@ -572,7 +612,7 @@ namespace elasticity1
     }
     Un=U; UnGhost=Un;
     if(Utilities::MPI::this_mpi_process(mpi_communicator)==0){
-      energy<<currentIncrement << "\t" <<freeEnergyMech << "\t"  << freeEnergyChemBulk << "\t" << freeEnergyChemGB << "\n" << std::flush;
+      energy<<currentIncrement << "\t" <<freeEnergyMech << "\t"  << freeEnergyChemBulk << "\t" << freeEnergyChemGB<<"\t"<< dF[0]<<"\t"<< dE[0]<<"\t"<<dF_dE[0] << "\t" << dF[1] << "\t" << dE[1] << "\t"<< dF_dE[1] << "\n" << std::flush;
     }
   }
 
@@ -661,7 +701,7 @@ int main(int argc, char *argv[]){
       using namespace dealii;
       using namespace elasticity1;
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
-      elasticity<2> problem;
+      elasticity<DIMS> problem;
       problem.run ();
     }
   catch (std::exception &exc)

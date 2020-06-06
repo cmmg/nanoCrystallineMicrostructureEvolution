@@ -81,8 +81,8 @@ void residualForChemo(FEValues<dim>& fe_values, unsigned int DOF, FEFaceValues<d
     evaluateFieldAtQuadraturePoint<dim>( q, phi, phi_conv, phi_j, sol, sol_conv, sol_j, mu , mu_j, fe_values,  DOF,fe_face_values,cell, dt,ULocal,  ULocalConv,  R,local_matrix,  currentIncrement,currentIteration, history, freeEnergyChemBulk, freeEnergyChemGB) ;
    
     double epsilon=InterfaceEnergyParameter;
-    double M=M_alpha, M_phi=Mobility;
-    //if(currentIncrement>3)M_phi=10.0;
+    double M=M_alpha, M_phi=Mobility_c;
+    //if(currentIncrement>5)M_phi=5.0;
     
     for(unsigned int i=0;i<dofs_per_cell;i++){
       int ci=fe_values.get_fe().system_to_component_index(i).first - dim;
