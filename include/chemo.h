@@ -13,11 +13,11 @@
 
 template<int dim>
 void evaluateFieldAtQuadraturePoint(unsigned int q, Table<1, double >&phi, Table<1, double >&phi_conv, Table<2, double >&phi_j, double&sol, double&sol_conv, Table<1, double >&sol_j,double&mu ,Table<1, double >&mu_j,FEValues<dim>& fe_values, unsigned int DOF, FEFaceValues<dim>& fe_face_values, const typename DoFHandler<dim>::active_cell_iterator &cell, double dt, dealii::Table<1,double >& ULocal, dealii::Table<1, double>& ULocalConv, Vector<double>& R,FullMatrix<double>&local_matrix,unsigned int currentIncrement,unsigned int currentIteration ,std::vector<historyVariables<dim>* >& history, double &freeEnergyChemBulk, double & freeEnergyChemGB) {
-
+  int var=0; if(isMechanics)var=dim;
   unsigned int dofs_per_cell=fe_values.dofs_per_cell;
   for(unsigned int i=0;i<dofs_per_cell;i++){
-
-    int ci=fe_values.get_fe().system_to_component_index(i).first - dim;
+    
+    int ci=fe_values.get_fe().system_to_component_index(i).first - var;
     if(ci>=0 && ci<n_diff_grains){
       phi[ci]+=fe_values.shape_value(i,q)*ULocal[i];
       phi_conv[ci]+=fe_values.shape_value(i,q)*ULocalConv[i];
@@ -68,7 +68,7 @@ void residualForChemo(FEValues<dim>& fe_values, unsigned int DOF, FEFaceValues<d
   for(unsigned int q=0;q<n_q_points;q++){
     Table<1, double >phi(n_diff_grains), phi_conv(n_diff_grains), sol_j(dim), mu_j(dim);
     Table<2,double >phi_j(n_diff_grains, dim);
-    // std::cout<<"control here";
+    
     for(unsigned int i=0;i<n_diff_grains;i++){phi[i]=0.; phi_conv[i]=0.;}
     for(unsigned int i=0;i<dim;i++){sol_j[i]=0.; mu_j[i]=0.;}
     for(unsigned int i=0;i<n_diff_grains;i++){
@@ -82,15 +82,15 @@ void residualForChemo(FEValues<dim>& fe_values, unsigned int DOF, FEFaceValues<d
    
     double epsilon=InterfaceEnergyParameter;
     double M=M_alpha, M_phi=Mobility_c;
-    //if(currentIncrement>5)M_phi=5.0;
+    
     
     for(unsigned int i=0;i<dofs_per_cell;i++){
-      int ci=fe_values.get_fe().system_to_component_index(i).first - dim;
+      int ci=fe_values.get_fe().system_to_component_index(i).first - DOF;
       
       if(ci>=0 && ci<n_diff_grains){
 	double phi2_sum=0.;
 	double W_sol=0.;
-	W_sol=1.0 ;//(5.0-2.7*sol-7.0*sol*sol);//WA*(1.0-sol)+WB*sol;
+	W_sol=1.0 ;
 	for(unsigned int I=0;I<n_diff_grains;I++){
 	  phi2_sum+=pow(phi[I],2);
 	}
@@ -113,8 +113,8 @@ void residualForChemo(FEValues<dim>& fe_values, unsigned int DOF, FEFaceValues<d
 
     for(unsigned int A=0;A<dofs_per_cell;A++){
       for(unsigned int B=0;B<dofs_per_cell;B++){
-	int ca=fe_values.get_fe().system_to_component_index(A).first- dim;
-	int cb=fe_values.get_fe().system_to_component_index(B).first - dim;
+	int ca=fe_values.get_fe().system_to_component_index(A).first- DOF;
+	int cb=fe_values.get_fe().system_to_component_index(B).first - DOF;
 	if(ca>=0 && ca<n_diff_grains ){
 	  if(cb>=0 && cb<n_diff_grains){
 	    if(ca==cb){
@@ -141,19 +141,9 @@ void residualForChemo(FEValues<dim>& fe_values, unsigned int DOF, FEFaceValues<d
       
     }//dofs I ends
 
-    
-    
-    
-    
   }
-  
-  
-  
-  
+    
 }
-
-
-
 
 #endif /* CHEMO_H_ */
 

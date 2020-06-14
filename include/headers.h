@@ -48,6 +48,7 @@ namespace LA
 #include <deal.II/lac/sparsity_tools.h>
 #include <deal.II/distributed/tria.h>
 #include <deal.II/distributed/grid_refinement.h>
+#include <deal.II/distributed/solution_transfer.h>
 #include <fstream>
 #include <iostream>
 #include  <sstream>

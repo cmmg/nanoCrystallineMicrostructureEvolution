@@ -1,31 +1,33 @@
 //problem geometry, mesh control
 #define DIMS 2
 #define problemWidth 1.0
-#define refinementFactor 7
+#define refinementFactor 5
+#define maxRefinementLevel 7
+#define minRefinementLevel 5
 
-//mechanics properties
-#define elasticModulus 1//2.0e11
-#define PoissonsRatio 0.3
-#define isFiniteStrain true
+//flags mechanics control
+#define isFiniteStrain false
+#define isMechanics false
 #define isTraction false
 //time step controls
 #define TimeStep 1.0e-2
 #define TotalTime 1000*TimeStep
+//grain-structure parameters
 #define N_seed_points 40
 #define n_diff_grains 6
-//#define yield_stress 1.0
-#define kappa1 5.0e-4
-#define Vm 1.0
+//Allen Cahn parametrs
 #define InterfaceEnergyParameter 5.0e-4
-#define Mobility 20.0//10.0//10.0// 10.0//50.0
-#define Mobility_c 20.0
-#define Mobility_m 20.0
-#define M_alpha 0.0//0.1//0.1
-#define lambda1 0.00//1.0e-2
-#define n_solute 1
-#define n_chemical_potential 1
-#define TotalDOF DIMS+n_diff_grains//+n_solute+n_chemical_potential
-//output controls
+#define Mobility 30.0
+#define Mobility_c 30.0
+#define Mobility_m 30.0
+
+#define TotalDOF n_diff_grains
+
+#if isMechanics
+#undef TotalDOF
+#define TotalDOF DIMS+n_diff_grains
+#endif
+
 #define outputFileName "solution"
 #define alpha1 2000
 #define beta1 1000
