@@ -120,9 +120,9 @@ template <class T, int dim>
   Table<2,double> Fe (dim, dim);
   Table<2,double> E (dim, dim);
   Table<2,double> gradU (dim, dim);
-  double Y=elasticModulus, nu=PoissonsRatio;
+  
   //Lame parameters
-  double lambda=(nu*Y)/((1+nu)*(1-2*nu)), mu=Y/(2*(1+nu));
+  
 
   for (unsigned int i=0; i<dim; ++i){
     for (unsigned int j=0; j<dim; ++j){
@@ -151,14 +151,14 @@ template <class T, int dim>
   }
   
   if(dim==2){
-    double nu12=0.253; double nu21=0.253;
+    double nu12=0.253; double nu21=0.253; double mu=500.0;
     ElasticModulus[0][0][0][0]=alpha1/(1-nu12*nu21);  ElasticModulus[0][0][1][1]=alpha1*nu21/(1-nu12*nu21);
     ElasticModulus[1][1][0][0]=beta1*nu12/(1-nu12*nu21);  ElasticModulus[1][1][1][1]=beta1/(1-nu12*nu21);
     ElasticModulus[0][1][0][1]= mu/2.;   ElasticModulus[0][1][1][0]=mu/2.;   ElasticModulus[1][0][0][1]=mu/2.;   ElasticModulus[1][0][1][0]=mu/2.;
   }
 
   if(dim==3){
-    materialConstants<dim> obj;
+    
     double Ex=1000.0; double Ey=2000.0; double Ez=1500.0;
     double nuxy=0.3; double nuyz=0.3; double nuzx=0.3;
     double nuyx=(Ey/Ex)*nuxy; double nuzy=(Ez/Ey)*nuyz; double nuxz=(Ex/Ez)*nuzx; 

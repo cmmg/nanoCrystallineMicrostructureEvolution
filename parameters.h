@@ -7,20 +7,21 @@
 
 //flags mechanics control
 #define isFiniteStrain false
-#define isMechanics false
+#define isMechanics true
 #define isTraction false
 //time step controls
 #define TimeStep 1.0e-2
 #define TotalTime 1000*TimeStep
 //grain-structure parameters
 #define N_seed_points 40
-#define n_diff_grains 6
+#define n_diff_grains 4
 //Allen Cahn parametrs
 #define InterfaceEnergyParameter 5.0e-4
 #define Mobility 30.0
 #define Mobility_c 30.0
 #define Mobility_m 30.0
-
+#define M_alpha 10.0
+#define Vm 1.0
 #define TotalDOF n_diff_grains
 
 #if isMechanics
