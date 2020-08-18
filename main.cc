@@ -32,7 +32,13 @@ namespace elasticity1
 	for(unsigned int i=0;i<dim;i++){
 	  values(i)=0.0;
 	}
-      }	
+      }
+      /*if(p[0]<0.0){
+	values(dim+0)=1.0; values(dim+1)=0.0;
+      }
+      else{
+	values(dim+0)=0.0; values(dim+1)=1.0;
+      }*/
       
       Table<1, double>distance(n_seed_points);
       for(unsigned int i=0;i<n_seed_points;i++){
@@ -93,6 +99,7 @@ namespace elasticity1
     std::vector<unsigned int>                 grain_ID;
     unsigned int                              n_seed_points;
     double                                    freeEnergyChemBulk, freeEnergyChemGB, freeEnergyMech;
+    //Timer                                     timer;
     std::vector<double>                       dF, dE, dF_dE;
     //solution variables
     unsigned int currentIncrement, currentIteration;
@@ -194,7 +201,7 @@ namespace elasticity1
 	VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.00, TotalDOF), constraints, uBCX1);
       }
       if(currentIncrement>3 && currentIncrement<=9){
-	VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.002, TotalDOF), constraints, uBCX1);
+	VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<dim>(0.002*problemHeight, TotalDOF), constraints, uBCX1);
       }
       VectorTools::interpolate_boundary_values (dof_handler, 1, ZeroFunction<dim>(TotalDOF), constraints2, uBCX1);
     }
@@ -209,15 +216,28 @@ namespace elasticity1
   template<int dim>
   void elasticity<dim>::grain_generation(){
     n_seed_points=N_seed_points;
-    double radii=1.0/std::sqrt(N_seed_points);
+    double radii;
+    if(subdividedRectangle)
+       radii=8.0;
+    else  radii=1.0/std::sqrt(N_seed_points);
     //pcout<<"radii"<<radii<<"\n";
     Point<dim> grain;
     std::srand(0.78);
     //srand (time(NULL));
-    grain[0]=(double)(std::rand()%100)/100.-0.50;
-    grain[1]=(double)(std::rand()%100)/100.-0.5;
-    if(dim==3){
-      grain[2]=(double)(std::rand()%100)/100.-0.5;
+    if(subdividedRectangle){
+      grain[0]=(double)(std::rand()%100)-50.0;
+      grain[1]=(double)(std::rand()%10)-5.0;
+      if(dim==3){
+	grain[2]=(double)(std::rand()%10)-5.0;
+      }
+    }
+    else{
+      //hyperCube mesh points
+      grain[0]=(double)(std::rand()%100)/100.-0.5;
+      grain[1]=(double)(std::rand()%100)/100.-0.5;
+      if(dim==3){
+        grain[2]=(double)(std::rand()%100)/100.-0.5;
+      }
     }
     grain_seeds.push_back(grain);
     
@@ -228,11 +248,21 @@ namespace elasticity1
 	cntr++;ctr=0;
 	if(cntr==200000){cond=0; break;}
 	Table<1, double>distance(I);
-	for(unsigned int k=0;k<I;k++)distance[k]=0.;
-	grain[0]=((double)(std::rand()%100)/100.0)-0.50;
-	grain[1]=((double)(std::rand()%100)/100.0)-0.50;
-	if(dim==3){
-	  grain[2]=((double)(std::rand()%100)/100.0)-0.50;
+	if(subdividedRectangle){
+	  for(unsigned int k=0;k<I;k++)distance[k]=0.;
+	  grain[0]=((double)(std::rand()%100))-50.0;
+	  grain[1]=((double)(std::rand()%10))-5.0;
+	  if(dim==3){
+	    grain[2]=((double)(std::rand()%10))-5.0;
+	  }
+	}
+	else{
+	  for(unsigned int k=0;k<I;k++)distance[k]=0.;
+          grain[0]=((double)(std::rand()%100)/100.)-0.5;
+          grain[1]=((double)(std::rand()%100)/100.)-0.5;
+          if(dim==3){
+            grain[2]=((double)(std::rand()%100)/100.)-0.5;
+          }
 	}
 	for(unsigned int k=0;k<I;k++){
 	  distance[k]=grain.distance(grain_seeds[k]);
@@ -285,7 +315,7 @@ namespace elasticity1
  
     
   }
-
+  /*
   template <int dim>
   void elasticity<dim>::refine_grid () {
     TimerOutput::Scope t(computing_timer, "adaptiveRefinement");
@@ -348,8 +378,8 @@ else if ( (mark_refine && (current_level < maxRefinementLevel))){
       //check for blocking in MPI                                                                                                              
       double checkSum=0.0;
       if (isMeshRefined){checkSum=1.0;}
-      checkSum= Utilities::MPI::sum(checkSum, mpi_communicator); //checkSum is greater then 0, then all processors call adative refinement sho\
-wn below                                                                                                                                       
+      checkSum= Utilities::MPI::sum(checkSum, mpi_communicator); 
+//checkSum is greater then 0, then all processors call adative refinement shown                                                                                                                                       
       
       if (checkSum>0.0){
         //execute refinement                                                                                                                   
@@ -377,7 +407,7 @@ wn below
     }
   }
 
-
+*/
   
   
   //Setup
@@ -400,7 +430,7 @@ wn below
     UnGhost.reinit (locally_owned_dofs, locally_relevant_dofs, mpi_communicator);
 
     //call applyBoundaryConditions to setup constraints matrix needed for generating the sparsity pattern
-    applyBoundaryConditions(0);
+    applyBoundaryConditions(currentIncrement);
 
     //
     DynamicSparsityPattern dsp (locally_relevant_dofs);
@@ -422,10 +452,29 @@ wn below
     U_L2.reinit (locally_owned_dofs, mpi_communicator);
     UGhost_L2.reinit (locally_owned_dofs, locally_relevant_dofs, mpi_communicator);
     
-    //setup history variables
+    
+    /*typename DoFHandler<dim>::active_cell_iterator cell=dof_handler.begin_active(), endc=dof_handler.end();
+    if(currentIncrement>0){
+      //typename DoFHandler<dim>::active_cell_iterator cell=dof_handler.begin_active(), endc=dof_handler.end();
+      //for(;cell!=endc; ++cell){
+      //if(cell->is_locally_owned()){
+      typename std::map<typename DoFHandler<dim>::active_cell_iterator , std::vector<historyVariables<dim>* > >::iterator it=history.begin(), endm=history.end();
+      for(;it!=endm; ++it){
+	typename std::vector<historyVariables<dim>* >::iterator it2=(it->second).begin(), endv=(it->second).end();
+	
+	for(;it2!=endv; ++it2){
+	  delete *it2;
+	}
+      }
+      //}
+      // }
+      history.clear();
+    }
+    //setup new history variables
     const QGauss<dim>  quadrature_formula(3);
     FEValues<dim> fe_values (fe, quadrature_formula, update_values);
-    typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(), endc = dof_handler.end();
+    //typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(), endc = dof_handler.end();
+    cell =dof_handler.begin_active(); endc = dof_handler.end();
     for (; cell!=endc; ++cell){
       if (cell->is_locally_owned()){
 	for (unsigned int q=0; q<fe_values.n_quadrature_points; q++){
@@ -440,7 +489,7 @@ wn below
 	    }
 	}
       }
-    }
+    }*/
   }
 
   //Assembly
@@ -468,6 +517,7 @@ wn below
       dF_dE.push_back(0.0);
     }
     typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(), endc = dof_handler.end();
+    //pcout<<"control 11\n";
     for (; cell!=endc; ++cell)
       if (cell->is_locally_owned()){
 	fe_values.reinit (cell);
@@ -478,23 +528,38 @@ wn below
 	  ULocal[i]=UGhost(local_dof_indices[i]);
 	  ULocalConv[i]= UnGhost(local_dof_indices[i]);
 	}
-	
+	//pcout<<"control 12\n";
 	deformationMap<double, dim> defMap(n_q_points);
 	if(isMechanics){
 	  getDeformationMap<double, dim>(fe_values, 0, ULocal, defMap, currentIteration);
+	  //pcout<<"control 13\n";
 	}
 	Table<1, double>phi_conv(n_diff_grains); double free_energy=0.;
 	
 	double fractionalTime=1.0;
+	Timer timer;
+	timer.start();
 	if(isMechanics){
+	  //Timer timer;
+	  timer.reset();
+	  timer.start();
+	  //pcout<<"control in mechanics loop"; exit(-1);
 	  residualForMechanics<dim>(fe_values,fe_face_values,cell, 0, ULocal, ULocalConv, defMap, currentIteration, history[cell], local_rhs, local_matrix, fractionalTime,freeEnergyMech, dF, dE, dF_dE, currentIncrement);
+	  timer.stop();
+	  //pcout<<"cpu MechRes"<< timer() <<"\n";
+	  //pcout<<"clock time Mechanics residual\t"<<timer.wall_time()<<"\n";
+	  
 	}
-	
-	int var=0; if(isMechanics)var=dim;
+	//pcout<<"control 14\n";
+	//Timer timer2;
+	int var=0; if(isMechanics)var=dim; 
+	timer.reset();
+	timer.start();
 	residualForChemo<dim>( fe_values, var,  fe_face_values,cell, dt, ULocal, ULocalConv, local_rhs, local_matrix, currentIncrement, currentIteration , history[cell],freeEnergyChemBulk, freeEnergyChemGB);
-	
-	
-	
+	timer.stop();
+	//pcout<<"cpu time ChemRes" << timer() <<"\n";
+	//pcout<< "clock time chemistry residual\t" << timer.wall_time() << "\n";
+	//exit(-1);
 	for(unsigned int i=0;i<dofs_per_cell;i++){
 	  local_rhs[i]=-local_rhs[i];
 	}
@@ -504,11 +569,24 @@ wn below
 	    constraints.distribute_local_to_global (local_matrix, local_rhs, local_dof_indices, system_matrix, system_rhs);
 	  }
 	  else{
+	    
+	    timer.reset();
+	    //Timer timer3;
+	    timer.start();
 	    constraints2.distribute_local_to_global (local_matrix, local_rhs, local_dof_indices, system_matrix, system_rhs);
+	    timer.stop();
+	    //  pcout<<"cpu constraint distribution"<<timer()<<"\n";
+	    //  pcout<<"clock time constraints distribution \t"<<timer.wall_time()<<"\n\n";
+	    //exit(-1);
 	  }
 	}
 	else{
+	  timer.reset();
+	  timer.start();
 	  constraints.distribute_local_to_global (local_matrix, local_rhs, local_dof_indices, system_matrix, system_rhs);
+	  timer.stop();
+	  //pcout<<"clock time constraints distribution \t"<<timer.wall_time()<<"\n\n";
+	  //exit(-1);
 	}
 	
 
@@ -525,7 +603,7 @@ wn below
     system_matrix.compress (VectorOperation::add);
     system_rhs.compress (VectorOperation::add);
   }
-  
+  /*
   template <int dim>
   void elasticity<dim>::l2_projection (){
     TimerOutput::Scope t(computing_timer, "projection");
@@ -553,10 +631,10 @@ wn below
 	  for(unsigned int i=0;i<dofs_per_cell;i++){
 	    const unsigned int ci = fe_values.get_fe().system_to_component_index(i).first;
 	    if (ci==0){
-	      local_rhs(i)+= fe_values.shape_value(i,q)*history[cell][q]->stress*fe_values.JxW(q);
+	      local_rhs(i)+= fe_values.shape_value(i,q)*1.0*fe_values.JxW(q);
 	    }
 	    else if (ci==1){
-	      local_rhs(i)+= fe_values.shape_value(i,q)*history[cell][q]->elasStrain12*fe_values.JxW(q);
+	      local_rhs(i)+= fe_values.shape_value(i,q)*1.0*fe_values.JxW(q);
 	    }
 	    for(unsigned int j=0;j<dofs_per_cell;j++){
 	      const unsigned int cj = fe_values.get_fe().system_to_component_index(j).first;
@@ -577,7 +655,7 @@ wn below
     solveIteration(true);
   }
 
-  
+  */
   //Solve
  template <int dim>
   void elasticity<dim>::solveIteration(bool isProject){
@@ -634,19 +712,33 @@ wn below
       //Direct solver MUMPS
     SolverControl cn;
       PETScWrappers::SparseDirectMUMPS solver(cn, mpi_communicator);
+      //pcout<<"control 0.0\n";
       if(!isProject){
+	//pcout<<"control 0.1\n";
 	solver.set_symmetric_mode(false);
+	//pcout<<"control 0.2\n";
+	//pcout<<"norm of system_rhs\t"<<system_rhs.l2_norm()<<"\n";
+	//pcout<<"norm of the CDS\t"<<completely_distributed_solution.l2_norm()<<"\n";
+	//pcout<<"frobenius norm"<<system_matrix.frobenius_norm()<<"\n";
 	solver.solve(system_matrix, completely_distributed_solution, system_rhs);
+	//pcout<<"norm of system_rhs\t"<<system_rhs.l2_norm()<<"\n";
+	//pcout<<"norm of the CDS\t"<<completely_distributed_solution.l2_norm()<<"\n";
+	//pcout<<"control 0.3\n";
 	if(isMechanics){
+	  //pcout<<"control 1\n";
 	  if ((currentIteration==0)){
+	    //pcout<<"control 2\n";
 	    constraints.distribute (completely_distributed_solution);
 	  }
 	  else{
+	    //pcout<<"control 3\n";
 	    constraints2.distribute (completely_distributed_solution);
 	  }
 	}
 	else{
+	  //pcout<<"control 4\n";
 	  constraints.distribute(completely_distributed_solution);
+	  //pcout<<"control 5\n";
 	}
 	locally_relevant_solution = completely_distributed_solution;
 	dU = completely_distributed_solution;
@@ -672,7 +764,9 @@ wn below
     while (true){
       if (currentIteration>=50){sprintf(buffer, "maximum number of iterations reached without convergence. \n"); pcout<<buffer; break; exit (1);}
       if (current_norm>1/std::pow(tol,2)){sprintf(buffer, "\n norm is too high. \n\n"); pcout<<buffer; break; exit (1);}
+      //pcout<<"control 8\n";
       assemble_system();
+      //pcout<<"control 9\n";
       current_norm=system_rhs.l2_norm();
       initial_norm=std::max(initial_norm, current_norm);
       res=current_norm/initial_norm;
@@ -683,6 +777,7 @@ wn below
 	break;
       }
       solveIteration();
+      //pcout<<"control 10\n";
       U+=dU; UGhost=U; 
       ++currentIteration;
     }
@@ -736,11 +831,29 @@ wn below
   template <int dim>
   void elasticity<dim>::run (){
     //setup problem geometry and mesh
+    if(subdividedRectangle){
+      Point<dim> p1,p2;
+      p1[0]=-problemHeight/2.0; p1[1]=-problemWidth/2.0; p1[2]=-problemWidth/2.0;
+      p2[0]=problemHeight/2.0; p2[1]=problemWidth/2.0; p2[2]=problemWidth/2.0;
+      
+      std::vector<unsigned int> repetitions;
+      repetitions.push_back(NumMeshPoints*std::floor(problemHeight/problemWidth));
+      repetitions.push_back(NumMeshPoints);
+      repetitions.push_back(NumMeshPoints);
+      // repetitions.push_back(NumMeshPoints*std::floor(problemHeight/problemWidth));
+      GridGenerator::subdivided_hyper_rectangle (triangulation, repetitions,p1,p2,true);
+      triangulation.refine_global (refinementFactor);
+    }
+    else{
     GridGenerator::hyper_cube (triangulation, -problemWidth/2.0, problemWidth/2.0, true);
     triangulation.refine_global (refinementFactor);
+    }
+    //pcout<<"control 1/n";
     grain_generation();
+    //pcout<<"control 2\n";
     setup_system ();
-    refine_grid();
+    //pcout<<"control 3\n";
+    //refine_grid();
     pcout << "   Number of active cells:       "
 	  << triangulation.n_global_active_cells()
 	  << std::endl
@@ -751,8 +864,9 @@ wn below
     //setup initial conditions
     
     //U=0.0;
- 
+    //pcout<<"control 4\n";
     VectorTools::interpolate(dof_handler, InitialConditions<dim>(&grain_seeds, &grain_ID,n_seed_points), U); Un=U;
+    //pcout<<"control 5\n";
     //sync ghost vectors to non-ghost vectors
     UGhost=U;  UnGhost=Un;
     output_results (0);
@@ -761,12 +875,15 @@ wn below
     currentIncrement=0;
     for (currentTime=0; currentTime<totalTime; currentTime+=dt){
       currentIncrement++;
+      //pcout<<"control 6\n";
       applyBoundaryConditions(currentIncrement);
       solve();
+      //pcout<<"control 7\n";
+      if(currentIncrement<10 || (currentIncrement%50==0))
       output_results(currentIncrement);
       //l2_projection();
       pcout << std::endl;
-      refine_grid();
+      //refine_grid();
       pcout << "   Number of active cells:       "
           << triangulation.n_global_active_cells()
           << std::endl

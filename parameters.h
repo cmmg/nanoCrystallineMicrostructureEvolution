@@ -1,22 +1,31 @@
-//problem geometry, mesh control
-#define DIMS 2
+#define DIMS 3
 #define problemWidth 1.0
-#define refinementFactor 5
-#define maxRefinementLevel 7
-#define minRefinementLevel 5
+#define refinementFactor 8
+#define subdividedRectangle true
 
-//flags mechanics control
-#define isFiniteStrain false
-#define isMechanics true
+#define problemHeight 100.0
+#define NumMeshPoints 3
+
+#if subdividedRectangle
+#undef problemWidth
+#undef refinementFactor
+#define problemWidth 10
+#define refinementFactor 2
+#endif
+
+#define maxRefinementLevel 7
+#define minRefinementLevel 4
+
+#define isFiniteStrain true
+#define isMechanics false
 #define isTraction false
-//time step controls
 #define TimeStep 1.0e-2
-#define TotalTime 1000*TimeStep
-//grain-structure parameters
-#define N_seed_points 40
+#define TotalTime 1500*TimeStep
+//grain-structure parameters                                                                  
+#define N_seed_points 50
 #define n_diff_grains 4
-//Allen Cahn parametrs
-#define InterfaceEnergyParameter 5.0e-4
+//Allen Cahn parametrs                                                                        
+#define InterfaceEnergyParameter 5.0//.0e-4
 #define Mobility 30.0
 #define Mobility_c 30.0
 #define Mobility_m 30.0

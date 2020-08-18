@@ -1,4 +1,3 @@
-//new
 //Computational Mechanics and Multiphysics Group @ UW-Madison
 //Created 2011
 //authors: rudraa (2011, 2018)
@@ -9,28 +8,28 @@
 #include "supplementaryFunctions.h"
 #include "deformationMap.h"
 
-
 template <int dim>
 struct historyVariables{
 public:
-  historyVariables<dim>():
-  alpha(0.0), beta (dim+1), betaIteration(dim+1), Ep(dim+1), EpIteration(dim+1), stress(0) ,elasStrain12(0.0){}
+  historyVariables<dim>();
+  //  alpha(0.0), beta (dim+1), betaIteration(dim+1), Ep(dim+1), EpIteration(dim+1), stress(0) ,elasStrain12(0.0){}
 
   //using std:::map to store time history variables
-  double alpha, alphaIteration;
+  /*double alpha, alphaIteration;
   double eqvStress, equvStrain;
   double elasStrain11, elasStrain12;
   dealii::Table<1, double > beta, betaIteration;
   double stress;
-  dealii::Table<1, double > Ep, EpIteration;
+  dealii::Table<1, double > Ep, EpIteration;*/
 };
 
 template<int dim>
 void assign_grain_id(Table<1, double>& angle,unsigned int & currentIncrement){
   std::srand(5.55);
-  for(unsigned int i=0;i<dim;i++){
-    if(i%2)angle[i]=0.0;
-    else angle[i]=90.0;
+  //  angle[0]=0.0; angle[1]=90.0; angle[2]=90.0; angle[3]=0.0;
+  for(unsigned int i=0;i<n_diff_grains;i++){
+    if(i%2)angle[i]=90.0;
+    else angle[i]=0.0;
   }
   
 }
@@ -59,6 +58,8 @@ void computeRotatedModulii(Table<4, double>&ElasticModulus, std::vector<FullMatr
     FullMatrix<double> rotation(dim, dim);
     for(unsigned int i=0;i<dim;i++)for(unsigned int j=0;j<dim;j++)rotation[i][j]=rotationMatrices[N][i][j];
     for(unsigned int i=0;i<dim;i++)for(unsigned int j=0;j<dim;j++)for(unsigned int k=0;k<dim;k++)for(unsigned int l=0;l<dim;l++)temp[i][j][k][l]=0.;
+    //    Timer timer;
+    // timer.start();
     for(unsigned int I=0;I<dim;I++){
       for(unsigned int i=0;i<dim;i++){
 	for(unsigned int J=0;J<dim;J++){
@@ -76,6 +77,9 @@ void computeRotatedModulii(Table<4, double>&ElasticModulus, std::vector<FullMatr
 	}
       }
     }
+    //timer.stop();
+    //std::cout<<"clock time elaspsed nested for loop"<<timer.wall_time()<<"\n";
+    //exit(-1);
     A_phi.push_back(temp);
   }
 }
@@ -88,11 +92,11 @@ template <class T, int dim>
 
   unsigned int dofs_per_cell= fe_values.dofs_per_cell;
   //update history variables at the start of increment
-  if (currentIteration==0){
+  /*if (currentIteration==0){
     history[q]->alpha=history[q]->alphaIteration;
     history[q]->beta=history[q]->betaIteration;
     history[q]->Ep=history[q]->EpIteration;
-  }
+  }*/
   //Table<1,double> grainOrientationAngle(n_diff_grains); phi(n_diff_grains);
   //calculate OrderParameter at quadrature point
   std::vector<FullMatrix<double> >rotationMatrices;
@@ -263,7 +267,7 @@ template <class T, int dim>
   }
   
   for(unsigned int i=0;i<n_diff_grains;i++)dF_dE[i]=dF[i]-dE[i];
-  history[q]->stress=secondPiola[0][0];
+  //history[q]->stress=secondPiola[0][0];
 }
 
 
