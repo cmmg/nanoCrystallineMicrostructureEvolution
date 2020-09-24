@@ -1,5 +1,5 @@
 ##
-#  CMake script for the main.cc
+#  CMake script for the step-40 tutorial program:
 ##
 
 # Set the name of the project and target:
