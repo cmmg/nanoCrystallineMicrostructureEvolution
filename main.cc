@@ -21,17 +21,35 @@ namespace phaseField1
   template <int dim>
   class InitalConditions: public Function<dim> {
   public:
+    std::vector<Point<dim> >* grainPoints;
+    std::vector<unsigned int>* grainID;
+    unsigned int n_seed_points;
     
-    InitalConditions (): Function<dim>(TotalDOF){std::srand(5);}
-   
+    InitalConditions (std::vector<Point<dim> >*_grainPoints, std::vector<unsigned int>*_grainID,unsigned int _n_seed_points): Function<dim>(TotalDOF),grainPoints(_grainPoints),grainID(_grainID),n_seed_points(_n_seed_points){}
+
     void vector_value (const Point<dim>   &p, Vector<double>   &values) const {
       Assert (values.size() == TotalDOF, ExcDimensionMismatch (values.size(),TotalDOF));
-     
-      values(0)=0.01;
       
-      if (std::sqrt(p.square())<0.25) {values(0)=0.99;}
-      values(1)=0.2 + 0.002*(0.5 -(double)(std::rand() % 100 )/100.0);
-      values(2)=0.;
+      Table<1,double>distance(n_seed_points);
+      for(unsigned int i=0;i<n_seed_points;i++){
+	distance[i]=p.distance((*grainPoints)[i]);
+      }
+      int min=0;
+      for(unsigned int i=0;i<n_seed_points;i++)
+	{
+	  if(distance[i]<distance[min])min=i;
+	}
+      unsigned int g_id=(*grainID)[min];
+      for(unsigned int i=0;i<n_diff_grains;i++)
+	{
+	  if(i== g_id)values(i)=1.0;
+	  else values(i)=0.00;
+	}
+      
+      // initial solute concentration
+      values(n_diff_grains)=0.2 + 0.002*(0.5 -(double)(std::rand() % 100 )/100.0);
+      // chemical potential initial condition
+      values(n_diff_grains+1)=0.;
     }
   };
   
@@ -63,6 +81,7 @@ namespace phaseField1
     LA::MPI::Vector                           system_rhs;
     ConditionalOStream                        pcout;
     TimerOutput                               computing_timer;
+    unsigned int                              n_seed_points;
     std::vector<Point<dim> >                  grain_seeds;
     std::vector<unsigned int>                 grain_ID;
     //solution variables
@@ -88,7 +107,12 @@ namespace phaseField1
     currentIncrement=0; currentTime=0;
     free_energy=0.;
     //nodal Solution names
-    nodal_solution_names.push_back("phase"); nodal_data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
+    char buffer[100];
+    for(unsigned int i=0;i<n_diff_grains;i++){
+      sprintf(buffer,"eta%u",i);
+      nodal_solution_names.push_back(buffer); nodal_data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
+    }
+      //_solution_names.push_back("phase"); nodal_data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
     nodal_solution_names.push_back("solute"); nodal_data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
     nodal_solution_names.push_back("mu"); nodal_data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
   }
@@ -111,17 +135,50 @@ namespace phaseField1
     constraints.close ();
   }
 
-  //grain Generation
-  
   template<int dim>
   void phaseField<dim>::grain_generation(){
+    n_seed_points=N_seed_points;
+    double radii=problemWidth/(std::sqrt(n_seed_points));
+    pcout<<"radii"<<radii<<"\n";
+    Point<dim> grain;
+    std::srand(0.78);
+    //srand (time(NULL));
+    grain[0]=((double)((std::rand())%100)/100)-0.5;
+    grain[1]=((double)((std::rand())%100)/100)-0.5;
+    
+    grain_seeds.push_back(grain);
+    
+    for(unsigned int I=1;I<n_seed_points;I++){
+      Point<dim>grain;
+      unsigned int ctr=1, cntr=0, cond=1;
+      while(ctr>0){
+	cntr++;ctr=0;
+	if(cntr==200000){cond=0; break;}
+	Table<1, double>distance(I);
+	for(unsigned int k=0;k<I;k++)distance[k]=0.;
+	grain[0]=((double)(std::rand()%100)/100)-0.5;
+	grain[1]=((double)(std::rand()%100)/100)-0.5;
+	for(unsigned int k=0;k<I;k++){
+	  distance[k]=grain.distance(grain_seeds[k]);
+	  if(distance[k]<radii)ctr++;
+	}
+	//while ends here
+      }
+      if(cond==0){n_seed_points=I;break;}
+      grain_seeds.push_back(grain);
+      //for loop ends for generating points
+    }
+    
+    double min=0.;
+    min=grain_seeds[0].distance(grain_seeds[1]);
 
     for(unsigned int i=0;i<n_seed_points;i++){
-      grain_seeds.push_back(Point<dim>());
-      grain_seeds[i][0]=((double)(std::rand()%problemWidth))-(problemWidth/2.0);
-      grain_seeds[i][1]=((double)(std::rand()%problemWidth))-(problemWidth/2.0);
-      // grain_seeds[i][2]=((double)(std::rand()%problemHeight))-(problemHeight/2.0);
+      for(unsigned int j=i+1;j<n_seed_points;j++){
+	if(grain_seeds[i].distance(grain_seeds[j])<min)min=grain_seeds[i].distance(grain_seeds[j]);
+      }
     }
+
+    std::cout<<"number of seed points"<<n_seed_points<<"minimum distance="<<min;
     //assign grain_ID to each seed point
     for(unsigned int i=0;i<n_seed_points;i++){
       if(i<n_diff_grains)grain_ID.push_back(i);
@@ -149,7 +206,13 @@ namespace phaseField1
 	//else ends
       }
     }
+
+    /*for(unsigned int I=0;I<n_seed_points;I++){
+      std::cout<<"coordinates"<<grain_seeds[I][0]<<" "<<grain_seeds[I][1]<<"\t grainID"<<grain_ID[I]<<"\n";
+      }*/
+    
   }
+          
   
   
   //Setup
@@ -225,7 +288,7 @@ namespace phaseField1
 	for (unsigned int i=0; i<dofs_per_cell; ++i) {R[i]=0.0;}
 	//if(currentIncrement==1 && currentIteration==1)std::cout<<" 1 ";
 	//populate residual vector 
-	residualForChemo(fe_values, 0, fe_face_values, cell, dt, ULocal, ULocalConv, R,/* currentTime, totalTime,*/ c_conv,local_matrix,currentIncrement,free_energy);
+	residualForChemo(fe_values, 0, fe_face_values, cell, dt, ULocal, ULocalConv, R,/* currentTime, totalTime,*/ local_matrix,currentIncrement,free_energy);
 	//if(currentIncrement==1 && currentIteration==1)std::cout<<" 2 ";
 	//evaluate Residual(R) and Jacobian(R')
 
@@ -371,7 +434,8 @@ namespace phaseField1
 	  << std::endl;
     
     //setup initial conditions
-    VectorTools::interpolate(dof_handler, InitalConditions<dim>(), U); Un=U;
+    grain_generation();
+    VectorTools::interpolate(dof_handler, InitalConditions<dim>(&grain_seeds, &grain_ID,n_seed_points), U); Un=U;
     
     //sync ghost vectors to non-ghost vectors
     UGhost=U;  UnGhost=Un;
