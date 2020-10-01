@@ -382,7 +382,7 @@ namespace phaseField1
     for (currentTime=0; currentTime<totalTime; currentTime+=dt){
       currentIncrement++;
       solve();
-      if(currentIncrement<100 || currentIncrement%100=00)
+      if(currentIncrement<100 || currentIncrement%100==0)
       output_results(currentIncrement);
       pcout << std::endl;
     }

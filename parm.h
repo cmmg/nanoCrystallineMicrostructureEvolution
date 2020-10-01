@@ -9,7 +9,7 @@
    //#define dFdC  400*c[q]*(c[q]-1.0)*(c[q]-0.5) //derivative of the free energy  
 #define Mobility 10.0//10//3.72e-4//0.5//*3.0e-12                                      
 #define M_gb     1e-4//2.64e-11//0.04                                           
-#define M_alpha  5.0//1.0e-4//1.0e-2//1.0e-4//1.0e-4 //0.001  
+#define M_alpha  1.0//1.0e-4//1.0e-2//1.0e-4//1.0e-4 //0.001  
    //time step controls                                                            
 #define TimeStep 5.0e-7
 #define TotalTime 50000*TimeStep
