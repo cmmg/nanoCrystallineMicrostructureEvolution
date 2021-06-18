@@ -1,44 +1,57 @@
+//mesh parameters
 #define DIMS 3
-#define problemWidth 1.0
-#define refinementFactor 8
-#define subdividedRectangle true
-
-#define problemHeight 100.0
-#define NumMeshPoints 3
-
-#if subdividedRectangle
-#undef problemWidth
-#undef refinementFactor
-#define problemWidth 10
-#define refinementFactor 2
-#endif
-
+#define refinementFactor 6
 #define maxRefinementLevel 7
-#define minRefinementLevel 4
+#define minRefinementLevel 3
+#define problemWidth 1.0
 
-#define isFiniteStrain true
-#define isMechanics false
-#define isTraction false
-#define TimeStep 1.0e-2
-#define TotalTime 1500*TimeStep
-//grain-structure parameters                                                                  
-#define N_seed_points 50
+// mechanics and solte drag control
+#define isMechanics true
+#define isSoluteDrag false
+#define isFiniteStrain false
+
+// grain growth parameters
+#define N_seed_points 40
 #define n_diff_grains 4
-//Allen Cahn parametrs                                                                        
-#define InterfaceEnergyParameter 5.0//.0e-4
-#define Mobility 30.0
-#define Mobility_c 30.0
-#define Mobility_m 30.0
-#define M_alpha 10.0
+#define InterfaceEnergyParameter 2.50e-3
+
+// Solute parameters
+#define WA 0.9
+#define WB 0.1
+#define kappa 5.0e-3
+#define n_solute 1
+#define n_chemical_potential 1
+
+//kinetic parameters
+#define TimeStep 5.0e-7
+#define TotalTime 1500*TimeStep
+#define Mobility 5.0e5
+#define M_alpha 1.0
+
+//other parameters and variables
+#define PI 3.1415
+#define outputFileName "solution"
 #define Vm 1.0
+#define wellHeight 1.0
+
+// elastic modulii
+#define alpha1 20000
+#define beta1 10000
+
+// degree of freedom per node
 #define TotalDOF n_diff_grains
 
 #if isMechanics
 #undef TotalDOF
-#define TotalDOF DIMS+n_diff_grains
+#define TotalDOF n_diff_grains + DIMS
 #endif
 
-#define outputFileName "solution"
-#define alpha1 2000
-#define beta1 1000
-#define PI 3.14159265359
+#if isSoluteDrag
+#undef TotalDOF
+#define TotalDOF n_diff_grains + n_solute + n_chemical_potential
+#endif
+
+#if (isMechanics && isSoluteDrag)
+#undef TotalDOF
+#define TotalDOF DIMS + n_diff_grains + n_solute + n_chemical_potential
+#endif
